@@ -6,8 +6,15 @@
 
 #include <typed-geometry/tg-lean.hh>
 
+#include <babel-serializer/errors.hh>
+
 namespace babel::pcd
 {
+struct read_config
+{
+    // empty for now
+};
+
 struct viewpoint_t
 {
     tg::pos3 position;
@@ -80,5 +87,5 @@ public:
 /// reads a point cloud from memory
 /// TODO: - stream-based interface
 ///       - control over pcd output data?
-point_cloud read(cc::span<std::byte const> data);
+point_cloud read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
 }

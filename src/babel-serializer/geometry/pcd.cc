@@ -8,8 +8,7 @@
 #include <clean-core/function_ptr.hh>
 #include <clean-core/function_ref.hh>
 #include <clean-core/string_view.hh>
-
-#include <babel-serializer/deserialization_error.hh>
+#include <clean-core/utility.hh>
 
 size_t babel::pcd::point_cloud::compute_stride() const
 {
@@ -57,7 +56,7 @@ void babel::pcd::point_cloud::allocate_data()
     data.resize(points * compute_stride());
 }
 
-babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
+babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data, read_config const&, error_handler on_error)
 {
     point_cloud pts;
 
@@ -68,7 +67,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
     auto get_line = [&]() -> cc::string_view {
         prev_pos = pos;
         if (pos >= data.size())
-            throw deserialization_error(pos, "excepted line");
+        {
+            on_error(data, data.last(0), "expected line", severity::error);
+            return "";
+        }
 
         // skip comment lines
         while (char(data[pos]) == '#')
@@ -112,7 +114,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         int i;
         auto r = std::sscanf(ss.c_str(), "%d", &i);
         if (r == 0)
-            throw deserialization_error(pos, "unable to parse int");
+        {
+            on_error(data, cc::as_byte_span(s), "unable to parse int", severity::error);
+            return 0;
+        }
         return i;
     };
     auto parse_int64 = [&](cc::string_view s) -> int64_t {
@@ -120,7 +125,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         int64_t i;
         auto r = std::sscanf(ss.c_str(), "%ld", &i);
         if (r == 0)
-            throw deserialization_error(pos, "unable to parse int");
+        {
+            on_error(data, cc::as_byte_span(s), "unable to parse int", severity::error);
+            return 0;
+        }
         return i;
     };
     auto parse_uint64 = [&](cc::string_view s) -> uint64_t {
@@ -128,7 +136,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         uint64_t i;
         auto r = std::sscanf(ss.c_str(), "%lu", &i);
         if (r == 0)
-            throw deserialization_error(pos, "unable to parse int");
+        {
+            on_error(data, cc::as_byte_span(s), "unable to parse uint", severity::error);
+            return 0;
+        }
         return i;
     };
     auto parse_float = [&](cc::string_view s) -> float {
@@ -136,7 +147,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         float f;
         auto r = std::sscanf(ss.c_str(), "%f", &f);
         if (r == 0)
-            throw deserialization_error(pos, "unable to parse int");
+        {
+            on_error(data, cc::as_byte_span(s), "unable to parse float", severity::error);
+            return 0;
+        }
         return f;
     };
     auto parse_double = [&](cc::string_view s) -> double {
@@ -144,7 +158,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         double f;
         auto r = std::sscanf(ss.c_str(), "%lf", &f);
         if (r == 0)
-            throw deserialization_error(pos, "unable to parse int");
+        {
+            on_error(data, cc::as_byte_span(s), "unable to parse double", severity::error);
+            return 0;
+        }
         return f;
     };
 
@@ -152,19 +169,27 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
     {
         auto s = get_line();
         if (!s.starts_with("VERSION "))
-            throw deserialization_error(prev_pos, "expected VERSION line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected VERSION line", severity::error);
+            return {};
+        }
 
         pts.version = s.subview(8).trim();
         // TODO: make me into some warning feature
         if (pts.version != "0.7" && pts.version != ".7" && pts.version != "7")
-            throw deserialization_error(prev_pos, "expected VERSION 0.7");
+        {
+            on_error(data, cc::as_byte_span(s), "expected VERSION 0.7", severity::warning);
+        }
     }
 
     // fields
     {
         auto s = get_line();
         if (!s.starts_with("FIELDS "))
-            throw deserialization_error(prev_pos, "expected FIELDS line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected FIELDS line", severity::error);
+            return {};
+        }
         s = s.subview(7).trim();
 
         for (auto name : s.split())
@@ -178,80 +203,119 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
     {
         auto s = get_line();
         if (!s.starts_with("SIZE "))
-            throw deserialization_error(prev_pos, "expected SIZE line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected SIZE line", severity::error);
+            return {};
+        }
         s = s.subview(5).trim();
 
         size_t i = 0;
         for (auto v : s.split())
         {
             if (i >= pts.fields.size())
-                throw deserialization_error(prev_pos, "too many entries");
+            {
+                on_error(data, cc::as_byte_span(s), "too many entries", severity::warning);
+                break;
+            }
 
-            pts.fields[i].size = parse_int(v);
+            auto si = parse_int(v);
+            if (si != 1 && si != 2 && si != 4 && si != 8)
+                on_error(data, cc::as_byte_span(v), "unknown size", severity::warning);
+            pts.fields[i].size = si;
 
             ++i;
         }
         if (i != pts.fields.size())
-            throw deserialization_error(prev_pos, "too few entries");
+        {
+            on_error(data, cc::as_byte_span(s), "too few entries", severity::error);
+            return {};
+        }
     }
 
     // type
     {
         auto s = get_line();
         if (!s.starts_with("TYPE "))
-            throw deserialization_error(prev_pos, "expected TYPE line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected TYPE line", severity::error);
+            return {};
+        }
         s = s.subview(5).trim();
 
         size_t i = 0;
         for (auto v : s.split())
         {
             if (i >= pts.fields.size())
-                throw deserialization_error(prev_pos, "too many entries");
+            {
+                on_error(data, cc::as_byte_span(v), "too many entries", severity::warning);
+                break;
+            }
 
             if (v != "I" && v != "U" && v != "F")
-                throw deserialization_error(prev_pos, "unknown type");
+                on_error(data, cc::as_byte_span(v), "unknown type", severity::warning);
+
+            if (v == "F" && pts.fields[i].size != 4 && pts.fields[i].size != 8)
+                on_error(data, cc::as_byte_span(v), "float field must be 4 or 8 bytes", severity::warning);
 
             pts.fields[i].type = v[0];
 
             ++i;
         }
         if (i != pts.fields.size())
-            throw deserialization_error(prev_pos, "too few entries");
+        {
+            on_error(data, cc::as_byte_span(s), "too few entries", severity::error);
+            return {};
+        }
     }
 
     // count
     {
         auto s = get_line();
         if (!s.starts_with("COUNT "))
-            throw deserialization_error(prev_pos, "expected COUNT line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected COUNT line", severity::error);
+            return {};
+        }
         s = s.subview(5).trim();
 
         size_t i = 0;
         for (auto v : s.split())
         {
             if (i >= pts.fields.size())
-                throw deserialization_error(prev_pos, "too many entries");
+            {
+                on_error(data, cc::as_byte_span(v), "too many entries", severity::warning);
+                break;
+            }
 
             pts.fields[i].count = parse_int(v);
 
             ++i;
         }
         if (i != pts.fields.size())
-            throw deserialization_error(prev_pos, "too few entries");
+        {
+            on_error(data, cc::as_byte_span(s), "too few entries", severity::error);
+            return {};
+        }
     }
 
     // width
     {
         auto s = get_line();
         if (!s.starts_with("WIDTH "))
-            throw deserialization_error(prev_pos, "expected WIDTH line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected WIDTH line", severity::error);
+            return {};
+        }
         pts.width = parse_int(s.subview(6).trim());
     }
     // height
     {
         auto s = get_line();
         if (!s.starts_with("HEIGHT "))
-            throw deserialization_error(prev_pos, "expected HEIGHT line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected HEIGHT line", severity::error);
+            return {};
+        }
         pts.height = parse_int(s.subview(7).trim());
     }
 
@@ -259,24 +323,34 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
     {
         auto s = get_line();
         if (!s.starts_with("VIEWPOINT "))
-            throw deserialization_error(prev_pos, "expected VIEWPOINT line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected VIEWPOINT line", severity::error);
+            return {};
+        }
         s = s.subview(10).trim();
 
         cc::vector<float> vp;
         for (auto v : s.split())
             vp.push_back(parse_float(v));
         if (vp.size() != 3 + 4)
-            throw deserialization_error(prev_pos, "expected 7 floats");
-
-        pts.viewpoint.position = {vp[0], vp[1], vp[2]};
-        pts.viewpoint.rotation = {vp[3], vp[4], vp[5], vp[6]};
+        {
+            on_error(data, cc::as_byte_span(s), "expected 7 floats", severity::warning);
+        }
+        else
+        {
+            pts.viewpoint.position = {vp[0], vp[1], vp[2]};
+            pts.viewpoint.rotation = {vp[3], vp[4], vp[5], vp[6]};
+        }
     }
 
     // points
     {
         auto s = get_line();
         if (!s.starts_with("POINTS "))
-            throw deserialization_error(prev_pos, "expected POINTS line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected POINTS line", severity::error);
+            return {};
+        }
         pts.points = parse_int(s.subview(7).trim());
     }
 
@@ -284,7 +358,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
     {
         auto s = get_line();
         if (!s.starts_with("DATA "))
-            throw deserialization_error(prev_pos, "expected DATA line");
+        {
+            on_error(data, cc::as_byte_span(s), "expected DATA line", severity::error);
+            return {};
+        }
         s = s.subview(5).trim();
 
         pts.allocate_data();
@@ -292,10 +369,13 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
         if (s == "binary")
         {
             if (data.size() - pos != pts.data.size())
-                throw deserialization_error(prev_pos, "DATA size mismatch");
+            {
+                on_error(data, cc::as_byte_span(s), "DATA size mismatch", severity::warning);
+                return {};
+            }
 
             // just a raw copy
-            std::memcpy(pts.data.data(), data.data() + pos, pts.data.size());
+            std::memcpy(pts.data.data(), data.data() + pos, cc::min(pts.data.size(), data.size() - pos));
         }
         else if (s == "ascii")
         {
@@ -335,7 +415,8 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
                                 });
                                 break;
                             default:
-                                throw deserialization_error(prev_pos, "invalid field size");
+                                parsers.push_back([&](std::byte*, cc::string_view) {});
+                                break;
                             }
                             break;
                         case 'U':
@@ -362,7 +443,8 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
                                 });
                                 break;
                             default:
-                                throw deserialization_error(prev_pos, "invalid field size");
+                                parsers.push_back([&](std::byte*, cc::string_view) {});
+                                break;
                             }
                             break;
                         case 'F':
@@ -379,7 +461,8 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
                                 });
                                 break;
                             default:
-                                throw deserialization_error(prev_pos, "invalid field size");
+                                parsers.push_back([&](std::byte*, cc::string_view) {});
+                                break;
                             }
                             break;
                         default:
@@ -402,7 +485,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
                 for (auto v : s.split())
                 {
                     if (i >= parsers.size())
-                        throw deserialization_error(prev_pos, "too many entries");
+                    {
+                        on_error(data, cc::as_byte_span(v), "too many entries", severity::warning);
+                        break;
+                    }
 
                     auto d = pts.data.data() + stride * p + offsets[i];
                     parsers[i](d, v);
@@ -410,11 +496,14 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data)
                     ++i;
                 }
                 if (i != parsers.size())
-                    throw deserialization_error(prev_pos, "too few entries");
+                    on_error(data, cc::as_byte_span(s), "too few entries", severity::warning);
             }
         }
         else
-            throw deserialization_error(prev_pos, "unexpected DATA format");
+        {
+            on_error(data, cc::as_byte_span(s), "unexpected DATA format", severity::error);
+            return {};
+        }
     }
 
     return pts;
