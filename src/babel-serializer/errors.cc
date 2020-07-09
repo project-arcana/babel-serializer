@@ -7,12 +7,12 @@
 
 #include <babel-serializer/source_map.hh>
 
-void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const std::byte> pos, const char* message, babel::severity s)
+void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const std::byte> pos, cc::string_view message, babel::severity s)
 {
     auto map = source_map(data);
 
-    auto ls = map.line_of(reinterpret_cast<char const*>(&pos.front()));
-    auto le = map.line_of(reinterpret_cast<char const*>(&pos.back()));
+    auto ls = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.front()));
+    auto le = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.back()));
 
     auto padding = 2;
     auto lls = cc::max(0, ls - padding);
