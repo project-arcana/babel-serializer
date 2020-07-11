@@ -1,5 +1,6 @@
 #pragma once
 
+#include <clean-core/fwd.hh>
 #include <clean-core/is_range.hh>
 #include <clean-core/span.hh>
 #include <clean-core/stream_ref.hh>
@@ -42,11 +43,29 @@ cc::string to_string(Obj const& obj, write_config const& cfg = {})
 
 namespace detail
 {
+template <class T, class = void>
+struct is_optional_t : std::false_type
+{
+};
+template <class T>
+struct is_optional_t<cc::optional<T>> : std::true_type
+{
+};
+
+template <class T, class = void>
+struct is_map_t : std::false_type
+{
+};
+template <class A, class B, class HashT, class EqualT>
+struct is_map_t<cc::map<A, B, HashT, EqualT>> : std::true_type
+{
+};
+
 // TODO: proper escaping
 struct json_writer_base
 {
     void write(cc::stream_ref<char> output, bool v) { output << (v ? "true" : "false"); }
-    void write(cc::stream_ref<char> output, std::nullptr_t) { output << "null"; }
+    void write(cc::stream_ref<char> output, cc::nullopt_t const&) { output << "null"; }
     void write(cc::stream_ref<char> output, char c)
     {
         char v[] = {'"', c, '"'};
@@ -65,6 +84,16 @@ struct json_writer_base
     void write(cc::stream_ref<char> output, double v) { cc::to_string(output, v); }
     void write(cc::stream_ref<char> output, char const* v) { output << '"' << cc::string_view(v) << '"'; }
     void write(cc::stream_ref<char> output, cc::string_view v) { output << '"' << v << '"'; }
+
+protected:
+    template <class T>
+    void write_optional(cc::stream_ref<char> output, T const& v)
+    {
+        if (v.has_value())
+            this->write(output, v.value());
+        else
+            output << "null";
+    }
 };
 
 struct json_writer_compact : json_writer_base
@@ -74,7 +103,35 @@ struct json_writer_compact : json_writer_base
     template <class Obj>
     void write(cc::stream_ref<char> output, Obj const& obj)
     {
-        if constexpr (rf::is_introspectable<Obj>)
+        if constexpr (is_optional_t<Obj>::value)
+        {
+            write_optional(output, obj);
+        }
+        else if constexpr (is_map_t<Obj>::value)
+        {
+            using key_t = typename Obj::key_t;
+            if constexpr (std::is_convertible_v<key_t, cc::string_view>)
+            {
+                output << '{';
+                auto first = true;
+                for (auto&& [key, value] : obj)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        output << ',';
+                    // TODO: escape
+                    output << '"' << cc::string_view(key) << "\":";
+                    write(output, value);
+                }
+                output << '}';
+            }
+            else
+            {
+                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+            }
+        }
+        else if constexpr (rf::is_introspectable<Obj>)
         {
             output << '{';
             auto first = true;
@@ -120,7 +177,40 @@ struct json_writer_pretty : json_writer_base
     template <class Obj>
     void write(cc::stream_ref<char> output, Obj const& obj)
     {
-        if constexpr (rf::is_introspectable<Obj>)
+        if constexpr (is_optional_t<Obj>::value)
+        {
+            write_optional(output, obj);
+        }
+        else if constexpr (is_map_t<Obj>::value)
+        {
+            using key_t = typename Obj::key_t;
+            if constexpr (std::is_convertible_v<key_t, cc::string_view>)
+            {
+                indent.resize(indent.size() + indent_inc, ' ');
+                output << "{\n";
+                auto first = true;
+                for (auto&& [key, value] : obj)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        output << ",\n";
+                    output << indent;
+                    // TODO: escape
+                    output << '"' << cc::string_view(key) << "\": ";
+                    write(output, value);
+                }
+                indent.resize(indent.size() - indent_inc);
+                if (!first)
+                    output << '\n';
+                output << indent << '}';
+            }
+            else
+            {
+                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+            }
+        }
+        else if constexpr (rf::is_introspectable<Obj>)
         {
             indent.resize(indent.size() + indent_inc, ' ');
             output << "{\n";
