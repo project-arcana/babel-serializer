@@ -17,7 +17,20 @@ namespace babel::json
 {
 struct read_config
 {
-    // empty for now
+    /// produces warnings if the json contains more data than needed for the serialization
+    /// (e.g. if an object has extra fields)
+    bool warn_on_extra_data = true;
+
+    /// produces warnings if the json is missing some data
+    /// (e.g. if an object has too few fields)
+    /// (behavior on missing data can be controlled via init_missing_data)
+    bool warn_on_missing_data = false;
+
+    /// if true, missing data is default-initialized
+    /// otherwise, missing data is left as-is (relevant for read_to with prefilled object)
+    bool init_missing_data = false;
+
+    // TODO: comments
 };
 struct write_config
 {
@@ -53,6 +66,12 @@ enum class node_type
 /// a non-owning read-only view on a json string
 struct json_ref
 {
+    struct child_range
+    {
+        size_t first_idx = 0;
+        size_t count = 0;
+    };
+
     /// a single node in a json tree
     /// NOTE: objects are have twice as many children as could be expected
     ///       they are actually pairs of key (string) -> value (json)
@@ -62,10 +81,9 @@ struct json_ref
         //      (or merged with next_sibling)
         node_type type;
         size_t next_sibling = 0; ///< if > 0 points to the next node of the same parent
-        union {
-            cc::string_view token; ///< only valid for leaf nodes
-            size_t first_child;    ///< only valid for composite nodes
-        };
+        cc::string_view token;
+        size_t first_child = 0; ///< only valid for composite nodes
+        size_t child_count = 0; ///< only valid for composite nodes (for object: number of keys)
 
         bool is_null() const { return type == node_type::null; }
         bool is_number() const { return type == node_type::number; }
@@ -83,11 +101,11 @@ struct json_ref
             return token[0] == 't';
         }
         cc::string get_string() const; ///< returns the unescaped string content
-        int get_int();
-        float get_float();
-        double get_double();
-        cc::int64 get_int64();
-        cc::uint64 get_uint64();
+        int get_int() const;
+        float get_float() const;
+        double get_double() const;
+        cc::int64 get_int64() const;
+        cc::uint64 get_uint64() const;
 
         node() {}
     };
@@ -103,6 +121,22 @@ struct json_ref
 /// NOTE: - does not convert numbers, only deduces types and structure
 ///       - the reference points into the json string (which must outlive the json_ref)
 json_ref read_ref(cc::string_view json, read_config const& cfg = {}, error_handler on_error = default_error_handler);
+
+/// parses the given json and deserializes it into the object
+/// (uses rf::introspect for introspectable objects)
+/// NOTE: read_config can be used to tweak behavior
+template <class Obj>
+void read_to(Obj& obj, cc::string_view json, read_config const& cfg = {}, error_handler on_error = default_error_handler);
+
+/// same as read_to but returns the object instead
+/// NOTE: Obj must be default-constructible
+template <class Obj>
+Obj read(cc::string_view json, read_config const& cfg = {}, error_handler on_error = default_error_handler)
+{
+    Obj obj;
+    babel::json::read_to(obj, json, cfg, on_error);
+    return obj;
+}
 
 // ====== IMPLEMENTATION ======
 
@@ -329,6 +363,128 @@ struct json_writer_pretty : json_writer_base
             static_assert(cc::always_false<Obj>, "obj is neither a range nor introspectable nor a predefined json type");
     }
 };
+
+// TODO: more error handling, especially for primitive parsing
+struct json_deserializer
+{
+    cc::span<std::byte const> all_data;
+    read_config const& cfg;
+    error_handler on_error;
+    json_ref const& jref;
+
+    void deserialize(json_ref::node const& n, bool& v);
+    void deserialize(json_ref::node const& n, char& v);
+    void deserialize(json_ref::node const& n, std::byte& v);
+    void deserialize(json_ref::node const& n, signed char& v);
+    void deserialize(json_ref::node const& n, unsigned char& v);
+    void deserialize(json_ref::node const& n, signed short& v);
+    void deserialize(json_ref::node const& n, unsigned short& v);
+    void deserialize(json_ref::node const& n, signed int& v);
+    void deserialize(json_ref::node const& n, unsigned int& v);
+    void deserialize(json_ref::node const& n, signed long& v);
+    void deserialize(json_ref::node const& n, unsigned long& v);
+    void deserialize(json_ref::node const& n, signed long long& v);
+    void deserialize(json_ref::node const& n, unsigned long long& v);
+    void deserialize(json_ref::node const& n, float& v);
+    void deserialize(json_ref::node const& n, double& v);
+    void deserialize(json_ref::node const& n, cc::string& v);
+    template <class Obj>
+    void deserialize(json_ref::node const& n, Obj& v)
+    {
+        if constexpr (is_optional_t<Obj>::value)
+        {
+            if (n.is_null())
+                v = {};
+            else
+            {
+                // TODO: option to partially preserve previous data?
+                if (!v.has_value())
+                    v.emplace(); // make space for value
+                deserialize(n, v.value());
+            }
+        }
+        else if constexpr (is_map_t<Obj>::value)
+        {
+            using key_t = typename Obj::key_t;
+            if constexpr (std::is_convertible_v<key_t, cc::string>)
+            {
+                if (!n.is_object())
+                    on_error(all_data, cc::as_byte_span(n.token), "expected 'object' node for map-like type with string-like keys", severity::error);
+                else
+                {
+                    // TODO: option to partially preserve previous data?
+                    v = {};
+                    // TODO: maybe .reserve? or via container_traits?
+                    auto ci = n.first_child;
+                    while (ci > 0)
+                    {
+                        auto const& cname = jref.nodes[ci];
+                        CC_ASSERT(cname.next_sibling > 0 && "corrupted deserialization?");
+                        CC_ASSERT(cname.is_string() && "corrupted deserialization?");
+                        ci = cname.next_sibling;
+                        auto const& cvalue = jref.nodes[ci];
+                        ci = cvalue.next_sibling;
+
+                        // TODO: map access via container_traits?
+                        deserialize(cvalue, v[cname.get_string()]);
+                    }
+                }
+            }
+            else
+            {
+                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+            }
+        }
+        else if constexpr (rf::is_introspectable<Obj>)
+        {
+            if (!n.is_object())
+                on_error(all_data, cc::as_byte_span(n.token), "expected 'object' node for rf::introspect based deserialization", severity::error);
+            else
+            {
+                // introspect members are not too many
+                // thus it might be faster to always search linearly for the correct key
+                // TODO: benchmark this. if slower, construct a map or something
+                size_t cnt = 0;
+                rf::do_introspect(
+                    [&](auto& member, cc::string_view name) {
+                        auto found = false;
+                        auto ci = n.first_child;
+                        while (ci > 0)
+                        {
+                            auto const& cname = jref.nodes[ci];
+                            CC_ASSERT(cname.next_sibling > 0 && "corrupted deserialization?");
+                            CC_ASSERT(cname.is_string() && "corrupted deserialization?");
+                            ci = cname.next_sibling;
+                            auto const& cvalue = jref.nodes[ci];
+                            ci = cvalue.next_sibling;
+
+                            if (cname.get_string() == name)
+                            {
+                                deserialize(cvalue, member);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found)
+                            ++cnt;
+                        else
+                        {
+                            if (cfg.warn_on_missing_data)
+                                on_error(all_data, cc::as_byte_span(n.token), "missing data for field '" + cc::string(name) + "'", severity::warning);
+                            if (cfg.init_missing_data)
+                                member = {};
+                        }
+                    },
+                    v);
+
+                if (cnt != n.child_count && cfg.warn_on_extra_data)
+                    on_error(all_data, cc::as_byte_span(n.token), "object contains extra data that could not be assigned", severity::warning);
+            }
+        }
+        else
+            static_assert(cc::always_false<Obj>, "obj type is not supported for deserialization");
+    }
+};
 }
 
 template <class Obj>
@@ -339,4 +495,16 @@ void write(cc::stream_ref<char> output, Obj const& obj, write_config const& cfg)
     else
         detail::json_writer_compact{}.write(output, obj);
 }
+
+template <class Obj>
+void read_to(Obj& obj, cc::string_view json, read_config const& cfg, error_handler on_error)
+{
+    auto const jref = read_ref(json, cfg, on_error);
+
+    if (jref.nodes.empty())
+        return; // error in read_ref
+
+    detail::json_deserializer{cc::as_byte_span(json), cfg, on_error, jref}.deserialize(jref.root(), obj);
+}
+
 }
