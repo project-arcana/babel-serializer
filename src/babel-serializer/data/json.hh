@@ -1,5 +1,6 @@
 #pragma once
 
+#include <clean-core/collection_traits.hh>
 #include <clean-core/fwd.hh>
 #include <clean-core/is_range.hh>
 #include <clean-core/span.hh>
@@ -479,6 +480,66 @@ struct json_deserializer
 
                 if (cnt != n.child_count && cfg.warn_on_extra_data)
                     on_error(all_data, cc::as_byte_span(n.token), "object contains extra data that could not be assigned", severity::warning);
+            }
+        }
+        else if constexpr (cc::collection_traits<Obj>::is_range)
+        {
+            using traits = cc::collection_traits<Obj>;
+            using element_t = typename traits::element_t;
+
+            // if elements can be added, collection is built from the ground up
+            if constexpr (traits::can_add)
+            {
+                // TODO: cc::collection_clear?
+                // TODO: option to preserve prev data?
+                v = {};
+                auto ci = n.first_child;
+                while (ci > 0)
+                {
+                    auto const& cvalue = jref.nodes[ci];
+                    // TODO: trait for emplace?
+                    element_t e;
+                    deserialize(cvalue, e);
+                    cc::collection_add(v, cc::move(e));
+                    ci = cvalue.next_sibling;
+                }
+            }
+            // otherwise it is assumed to have been pre-sized
+            // TODO: support resizeable collections that cannot add, like cc::array
+            else
+            {
+                auto it = traits::begin(v);
+                auto end = traits::end(v);
+                auto ci = n.first_child;
+                while (ci > 0)
+                {
+                    if (!(it != end))
+                    {
+                        if (cfg.warn_on_extra_data)
+                            on_error(all_data, cc::as_byte_span(n.token), "array contains extra data that could not be assigned", severity::warning);
+                        break;
+                    }
+
+                    auto const& cvalue = jref.nodes[ci];
+                    deserialize(cvalue, *it);
+                    ci = cvalue.next_sibling;
+                    ++it;
+                }
+
+                if (it != end)
+                {
+                    if (cfg.warn_on_missing_data)
+                        on_error(all_data, cc::as_byte_span(n.token), "array contains not enough data", severity::warning);
+
+                    if (cfg.init_missing_data)
+                    {
+                        while (it != end)
+                        {
+                            *it = {};
+                            ++it;
+                        }
+                    }
+                }
             }
         }
         else
