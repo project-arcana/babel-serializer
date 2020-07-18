@@ -42,7 +42,7 @@ struct write_config
 /// writes json to the stream from a given object
 /// (uses rf::introspect to serialize the object)
 template <class Obj>
-void write(cc::stream_ref<char> output, Obj const& obj, write_config const& cfg = {});
+void write(cc::string_stream_ref output, Obj const& obj, write_config const& cfg = {});
 
 /// creates a json string from a given object
 /// (uses rf::introspect to serialize the object)
@@ -163,31 +163,31 @@ struct is_map_t<cc::map<A, B, HashT, EqualT>> : std::true_type
 
 /// writes a string as "abc" to the output
 /// escapes reserved json character using backslash
-void write_escaped_string(cc::stream_ref<char> output, cc::string_view s);
+void write_escaped_string(cc::string_stream_ref output, cc::string_view s);
 
 // TODO: maybe use template specialization to customize json read/write
 struct json_writer_base
 {
-    void write(cc::stream_ref<char> output, bool v) { output << (v ? "true" : "false"); }
-    void write(cc::stream_ref<char> output, cc::nullopt_t const&) { output << "null"; }
-    void write(cc::stream_ref<char> output, char c) { write_escaped_string(output, cc::string_view(&c, 1)); }
-    void write(cc::stream_ref<char> output, std::byte v) { cc::to_string(output, int(v)); }
-    void write(cc::stream_ref<char> output, signed char v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, unsigned char v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, signed int v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, unsigned int v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, signed long v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, unsigned long v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, signed long long v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, unsigned long long v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, float v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, double v) { cc::to_string(output, v); }
-    void write(cc::stream_ref<char> output, char const* v) { write_escaped_string(output, v); }
-    void write(cc::stream_ref<char> output, cc::string_view v) { write_escaped_string(output, v); }
+    void write(cc::string_stream_ref output, bool v) { output << (v ? "true" : "false"); }
+    void write(cc::string_stream_ref output, cc::nullopt_t const&) { output << "null"; }
+    void write(cc::string_stream_ref output, char c) { write_escaped_string(output, cc::string_view(&c, 1)); }
+    void write(cc::string_stream_ref output, std::byte v) { cc::to_string(output, int(v)); }
+    void write(cc::string_stream_ref output, signed char v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned char v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed int v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned int v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed long long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned long long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, float v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, double v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, char const* v) { write_escaped_string(output, v); }
+    void write(cc::string_stream_ref output, cc::string_view v) { write_escaped_string(output, v); }
 
 protected:
     template <class T>
-    void write_optional(cc::stream_ref<char> output, T const& v)
+    void write_optional(cc::string_stream_ref output, T const& v)
     {
         if (v.has_value())
             this->write(output, v.value());
@@ -201,7 +201,7 @@ struct json_writer_compact : json_writer_base
     using json_writer_base::write;
 
     template <class Obj>
-    void write(cc::stream_ref<char> output, Obj const& obj)
+    void write(cc::string_stream_ref output, Obj const& obj)
     {
         if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
         {
@@ -279,7 +279,7 @@ struct json_writer_pretty : json_writer_base
     using json_writer_base::write;
 
     template <class Obj>
-    void write(cc::stream_ref<char> output, Obj const& obj)
+    void write(cc::string_stream_ref output, Obj const& obj)
     {
         if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
         {
@@ -549,7 +549,7 @@ struct json_deserializer
 }
 
 template <class Obj>
-void write(cc::stream_ref<char> output, Obj const& obj, write_config const& cfg)
+void write(cc::string_stream_ref output, Obj const& obj, write_config const& cfg)
 {
     if (cfg.indent >= 0)
         detail::json_writer_pretty{cfg.indent}.write(output, obj);
