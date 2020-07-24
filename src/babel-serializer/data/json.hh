@@ -14,6 +14,16 @@
 
 #include <babel-serializer/errors.hh>
 
+/**
+ * JSON serialization and deserialization
+ *
+ * Missing features:
+ * - enums via string values
+ * - non-introspect customization
+ * - full unicode
+ * - writing custom json (not via introspect)
+ */
+
 namespace babel::json
 {
 struct read_config
@@ -32,6 +42,7 @@ struct read_config
     bool init_missing_data = false;
 
     // TODO: comments
+    // TODO: enums via strings
 };
 struct write_config
 {
@@ -203,7 +214,11 @@ struct json_writer_compact : json_writer_base
     template <class Obj>
     void write(cc::string_stream_ref output, Obj const& obj)
     {
-        if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
+        if constexpr (std::is_enum_v<Obj>)
+        {
+            cc::to_string(output, std::underlying_type_t<Obj>(obj));
+        }
+        else if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
         {
             write_escaped_string(output, cc::string_view(obj));
         }
@@ -295,7 +310,11 @@ struct json_writer_pretty : json_writer_base
     template <class Obj>
     void write(cc::string_stream_ref output, Obj const& obj)
     {
-        if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
+        if constexpr (std::is_enum_v<Obj>)
+        {
+            cc::to_string(output, std::underlying_type_t<Obj>(obj));
+        }
+        else if constexpr (std::is_constructible_v<cc::string_view, Obj const&>)
         {
             write_escaped_string(output, cc::string_view(obj));
         }
@@ -425,7 +444,14 @@ struct json_deserializer
     template <class Obj>
     void deserialize(json_ref::node const& n, Obj& v)
     {
-        if constexpr (is_optional_t<Obj>::value)
+        if constexpr (std::is_enum_v<Obj>)
+        {
+            using int_t = std::underlying_type_t<Obj>;
+            int_t nr = 0;
+            this->deserialize(n, nr);
+            v = Obj(nr);
+        }
+        else if constexpr (is_optional_t<Obj>::value)
         {
             if (n.is_null())
                 v = {};
