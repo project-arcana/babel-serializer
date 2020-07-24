@@ -232,7 +232,21 @@ struct json_writer_compact : json_writer_base
             }
             else
             {
-                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+                output << '[';
+                auto first = true;
+                for (auto&& [key, value] : obj)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        output << ',';
+                    output << '[';
+                    write(output, key);
+                    output << ',';
+                    write(output, value);
+                    output << ']';
+                }
+                output << ']';
             }
         }
         else if constexpr (rf::is_introspectable<Obj>)
@@ -315,7 +329,26 @@ struct json_writer_pretty : json_writer_base
             }
             else
             {
-                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+                indent.resize(indent.size() + indent_inc, ' ');
+                output << "[\n";
+                auto first = true;
+                for (auto&& [key, value] : obj)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        output << ",\n";
+                    output << indent;
+                    output << '[';
+                    write(output, key);
+                    output << ", ";
+                    write(output, value);
+                    output << ']';
+                }
+                indent.resize(indent.size() - indent_inc);
+                if (!first)
+                    output << '\n';
+                output << indent << ']';
             }
         }
         else if constexpr (rf::is_introspectable<Obj>)
@@ -433,7 +466,34 @@ struct json_deserializer
             }
             else
             {
-                static_assert(cc::always_false<Obj>, "only map<string-like, Value> supported for now");
+                if (!n.is_array())
+                    on_error(all_data, cc::as_byte_span(n.token), "expected array of 2-arrays for map-like type with non-string-like keys", severity::error);
+                else
+                {
+                    // TODO: option to partially preserve previous data?
+                    v = {};
+                    // TODO: maybe .reserve? or via container_traits?
+                    auto ci = n.first_child;
+                    while (ci > 0)
+                    {
+                        auto const& centry = jref.nodes[ci];
+                        if (!centry.is_array() || centry.child_count != 2)
+                        {
+                            on_error(all_data, cc::as_byte_span(centry.token), "expected 2-array [key, value]", severity::error);
+                            break;
+                        }
+                        ci = centry.next_sibling;
+
+                        auto const& ckey = jref.nodes[centry.first_child];
+                        CC_ASSERT(ckey.next_sibling > 0 && "corrupted deserialization");
+                        auto const& cvalue = jref.nodes[ckey.next_sibling];
+
+                        // TODO: map access via container_traits?
+                        key_t key;
+                        deserialize(ckey, key);
+                        deserialize(cvalue, v[key]);
+                    }
+                }
             }
         }
         else if constexpr (rf::is_introspectable<Obj>)
