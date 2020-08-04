@@ -121,10 +121,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data, read_co
         }
         return i;
     };
-    auto parse_int64 = [&](cc::string_view s) -> int64_t {
+    auto parse_int64 = [&](cc::string_view s) -> long long int {
         cc::string ss = s; // null-terminated
-        int64_t i;
-        auto r = std::sscanf(ss.c_str(), "%ld", &i);
+        long long int i;
+        auto r = std::sscanf(ss.c_str(), "%lld", &i);
         if (r == 0)
         {
             on_error(data, cc::as_byte_span(s), "unable to parse int", severity::error);
@@ -132,10 +132,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data, read_co
         }
         return i;
     };
-    auto parse_uint64 = [&](cc::string_view s) -> uint64_t {
+    auto parse_uint64 = [&](cc::string_view s) -> unsigned long long int {
         cc::string ss = s; // null-terminated
-        uint64_t i;
-        auto r = std::sscanf(ss.c_str(), "%lu", &i);
+        unsigned long long int i;
+        auto r = std::sscanf(ss.c_str(), "%llu", &i);
         if (r == 0)
         {
             on_error(data, cc::as_byte_span(s), "unable to parse uint", severity::error);

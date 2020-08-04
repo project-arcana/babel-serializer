@@ -96,3 +96,5 @@ void babel::file::write_lines(cc::string_view filename, cc::range_ref<cc::string
             file.write(line.data(), line.size());
     });
 }
+
+bool babel::file::exists(cc::string_view filename) { return std::ifstream(cc::string(filename).c_str()).good(); }
