@@ -1,6 +1,24 @@
 #include "image.hh"
 
+#include <clean-core/assertf.hh>
+#include <clean-core/string.hh>
+
 #include <babel-serializer/detail/stb_image.hh>
+
+static int bit_depth_byte_size(babel::image::bit_depth d)
+{
+    switch (d)
+    {
+    case babel::image::bit_depth::u8:
+        return 1;
+    case babel::image::bit_depth::u16:
+        return 2;
+    case babel::image::bit_depth::f32:
+        return 4;
+    default:
+        CC_UNREACHABLE("unsupported bit depth");
+    }
+}
 
 babel::image::data babel::image::read(cc::span<const std::byte> data, read_config const& cfg, error_handler on_error)
 {
@@ -23,21 +41,17 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
     // load
     int w, h;
     int stored_channels;
-    int bit_depth_size;
     std::byte const* ptr;
     switch (d.bit_depth)
     {
     case bit_depth::u8:
         ptr = reinterpret_cast<std::byte const*>(babel_stbi_load_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
-        bit_depth_size = 1;
         break;
     case bit_depth::u16:
         ptr = reinterpret_cast<std::byte const*>(babel_stbi_load_16_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
-        bit_depth_size = 1;
         break;
     case bit_depth::f32:
         ptr = reinterpret_cast<std::byte const*>(babel_stbi_loadf_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
-        bit_depth_size = 1;
         break;
     default:
         CC_UNREACHABLE("unsupported bit depth");
@@ -51,7 +65,7 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
         d.width = w;
         d.height = h;
         d.depth = 1;
-        d.data = cc::array<std::byte>::uninitialized(w * h * int(d.channels) * bit_depth_size);
+        d.data = cc::array<std::byte>::uninitialized(w * h * int(d.channels) * bit_depth_byte_size(d.bit_depth));
         std::memcpy(d.data.data(), ptr, d.data.size());
     }
     else // error
@@ -60,4 +74,82 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
     }
 
     return d;
+}
+
+bool babel::image::write(cc::stream_ref<std::byte> output,
+                         const babel::image::data_header& img,
+                         cc::span<const std::byte> data,
+                         const babel::image::write_config& cfg,
+                         babel::error_handler on_error)
+{
+    CC_ASSERT(!cfg.format.empty() && "must provide a format");
+    CC_ASSERT(img.is_valid());
+
+    auto expected_size = img.width * img.height * img.depth * bit_depth_byte_size(img.bit_depth);
+    CC_ASSERTF(expected_size == int(data.size()), "image data size is not what is expected (expected {}, got {})", expected_size, data.size());
+
+    auto write_func = +[](void* ctx, void* data, int size) {
+        *reinterpret_cast<cc::stream_ref<std::byte>*>(ctx) << cc::span<std::byte const>(reinterpret_cast<std::byte const*>(data), size);
+    };
+
+    CC_ASSERT(img.depth == 1 && "3D / layered images not supported");
+
+    auto fmt = cc::string(cfg.format).to_lower();
+    if (cfg.format == "png")
+    {
+        CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
+        if (!babel_stbi_write_png_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data(),
+                                          int(img.channels) * img.width * img.height * bit_depth_byte_size(img.bit_depth)))
+        {
+            on_error({}, {}, babel_stbi_failure_reason(), severity::error);
+            return false;
+        }
+    }
+    else if (cfg.format == "bmp")
+    {
+        CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
+        if (!babel_stbi_write_bmp_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data()))
+        {
+            on_error({}, {}, babel_stbi_failure_reason(), severity::error);
+            return false;
+        }
+    }
+    else if (cfg.format == "tga")
+    {
+        CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
+        if (!babel_stbi_write_tga_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data()))
+        {
+            on_error({}, {}, babel_stbi_failure_reason(), severity::error);
+            return false;
+        }
+    }
+    else if (cfg.format == "jpg")
+    {
+        CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
+        if (!babel_stbi_write_jpg_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data(), cfg.jpg_quality))
+        {
+            on_error({}, {}, babel_stbi_failure_reason(), severity::error);
+            return false;
+        }
+    }
+    else if (cfg.format == "hdr")
+    {
+        CC_ASSERT(img.bit_depth == bit_depth::f32 && "currently only 32bit float supported");
+        if (!babel_stbi_write_hdr_to_func(write_func, &output, img.width, img.height, int(img.channels), reinterpret_cast<float const*>(data.data())))
+        {
+            on_error({}, {}, babel_stbi_failure_reason(), severity::error);
+            return false;
+        }
+    }
+    else
+    {
+        CC_ASSERTF(false, "unsupported format {}", cfg.format);
+    }
+
+    return true;
+}
+
+bool babel::image::write(cc::stream_ref<std::byte> output, data const& img, write_config const& cfg, error_handler on_error)
+{
+    return write(output, img, img.data, cfg, on_error);
 }
