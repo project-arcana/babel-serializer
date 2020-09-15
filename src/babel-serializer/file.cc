@@ -98,3 +98,5 @@ void babel::file::write_lines(cc::string_view filename, cc::range_ref<cc::string
 }
 
 bool babel::file::exists(cc::string_view filename) { return std::ifstream(cc::string(filename).c_str()).good(); }
+
+babel::file::file_output_stream::file_output_stream(cc::string_view filename) { fopen(cc::string(filename).c_str(), "w"); }
