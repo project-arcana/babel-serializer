@@ -65,8 +65,8 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
         d.width = w;
         d.height = h;
         d.depth = 1;
-        d.data = cc::array<std::byte>::uninitialized(w * h * int(d.channels) * bit_depth_byte_size(d.bit_depth));
-        std::memcpy(d.data.data(), ptr, d.data.size());
+        d.bytes = cc::array<std::byte>::uninitialized(w * h * int(d.channels) * bit_depth_byte_size(d.bit_depth));
+        std::memcpy(d.bytes.data(), ptr, d.bytes.size());
     }
     else // error
     {
@@ -151,5 +151,5 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
 
 bool babel::image::write(cc::stream_ref<std::byte> output, data const& img, write_config const& cfg, error_handler on_error)
 {
-    return write(output, img, img.data, cfg, on_error);
+    return write(output, img, img.bytes, cfg, on_error);
 }
