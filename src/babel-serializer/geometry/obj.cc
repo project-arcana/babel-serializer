@@ -1,7 +1,7 @@
-#include <cstdio>      // std::sscanf
 #include <type_traits> // std::is_same_v
 
 #include <clean-core/char_predicates.hh>
+#include <clean-core/from_string.hh>
 
 #include "obj.hh"
 
@@ -12,7 +12,6 @@
  *  - materials
  *  - merging groups
  *  - smoothing groups
- *  - disable MSVC warning that sscanf is deprecated
  *  - additional error checks (all indices must be valid)
  */
 
@@ -30,92 +29,30 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
     int group_line_start = 0;
     int group_face_start = 0;
 
-    size_t prev_pos = 0;
-    size_t pos = 0;
-    auto const next_line = [&]() -> cc::string_view {
-        prev_pos = pos;
-        if (pos >= data.size())
-        {
-            on_error(data, data.last(0), "expected line", severity::error);
-        }
-
-        // skip comment lines
-        while (pos < data.size() && char(data[pos]) == '#')
-        {
-            while (pos < data.size() && char(data[pos]) != '\n')
-                ++pos;
-            if (pos < data.size() && char(data[pos]) == '\n')
-                ++pos;
-        }
-
-        auto p_start = reinterpret_cast<char const*>(data.data() + pos);
-        while (pos < data.size())
-        {
-            auto c = char(data[pos]);
-            if (c == '\n' || c == '#')
-                break;
-
-            ++pos;
-        }
-        auto p_end = reinterpret_cast<char const*>(data.data() + pos);
-
-        // ignore rest of comment
-        while (pos < data.size())
-        {
-            auto c = char(data[pos]);
-            if (c == '\n')
-                break;
-
-            ++pos;
-        }
-
-        // point behind newline
-        if (pos < data.size() && char(data[pos]) == '\n')
-            ++pos;
-
-        // trim whitespaces
-        while (pos < data.size() && cc::is_space(char(data[pos])))
-            ++pos;
-
-        return cc::string_view(p_start, p_end);
-    };
-
-    auto const has_more_lines = [&]() -> bool { return pos < data.size(); };
-
     auto const parse_int = [&](cc::string_view s) -> int {
-        cc::string ss = s; // null-terminated
         int i;
-        auto const r = std::sscanf(ss.c_str(), "%d", &i);
-        if (r == 0)
+        if (cc::from_string(s, i))
+        {
+            return i;
+        }
+        else
         {
             on_error(data, cc::as_byte_span(s), "unable to parse int", severity::error);
             return 0;
         }
-        return i;
     };
 
     auto const parse_float = [&](cc::string_view s) -> ScalarT {
-        cc::string ss = s; // null-terminated
         ScalarT f;
-        if constexpr (std::is_same_v<ScalarT, float>)
+        if (cc::from_string(s, f))
         {
-            auto const r = std::sscanf(ss.c_str(), "%f", &f);
-            if (r == 0)
-            {
-                on_error(data, cc::as_byte_span(s), "unable to parse float", severity::error);
-                return 0;
-            }
+            return f;
         }
         else
         {
-            auto const r = std::sscanf(ss.c_str(), "%lf", &f);
-            if (r == 0)
-            {
-                on_error(data, cc::as_byte_span(s), "unable to parse double", severity::error);
-                return 0;
-            }
+            on_error(data, cc::as_byte_span(s), "unable to parse float", severity::error);
+            return ScalarT(0);
         }
-        return f;
     };
 
     auto const parse_vertex = [&](cc::string_view line) {
@@ -129,6 +66,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             if (i > 3)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse vertex", severity::error);
+                break;
             }
             p[i++] = parse_float(s);
         }
@@ -147,6 +85,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             if (i > 2)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse texture vertex", severity::error);
+                break;
             }
             p[i++] = parse_float(s);
         }
@@ -164,6 +103,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             if (i > 2)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse vertex normal", severity::error);
+                break;
             }
             p[i++] = parse_float(s);
         }
@@ -182,6 +122,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             if (i > 2)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse free-form vertex", severity::error);
+                break;
             }
             p[i++] = parse_float(s);
         }
@@ -189,17 +130,22 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
     };
 
     auto const parse_face = [&](cc::string_view line) {
+        CC_ASSERT(line[0] == 'f');
+        CC_ASSERT(cc::is_space(line[1]));
         auto const parse_entry = [&](cc::string_view s) {
             typename obj::geometry<ScalarT>::face_entry e;
 
             int i = 0;
-            for (auto const seg : s.split('/'))
+            for (auto const seg : s.split('/', cc::split_options::keep_empty))
             {
-                if (i == 0) // vertex index
+                switch (i)
+                {
+                case 0: // vertex index
                 {
                     if (seg.empty())
                     {
                         on_error(data, cc::as_byte_span(line), "unable to parse face entry: missing vertex index", severity::error);
+                        return;
                     }
                     auto const idx = parse_int(seg);
                     if (idx < 0) // relative index
@@ -207,7 +153,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
                     else
                         e.vertex_idx = idx - 1;
                 }
-                if (i == 1) // tex_coord_idx
+                break;
+                case 1: // tex_coord_idx
                 {
                     if (!seg.empty())
                     {
@@ -218,7 +165,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
                             e.tex_coord_idx = idx - 1;
                     }
                 }
-                if (i == 2) // normal idx
+                break;
+                case 2: // normal idx
                 {
                     if (!seg.empty())
                     {
@@ -229,16 +177,19 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
                             e.normal_idx = idx - 1;
                     }
                 }
-                if (i >= 3)
+                break;
+                default:
                 {
                     on_error(data, cc::as_byte_span(line), "unable to parse face entry: unknown format", severity::error);
+                    return;
                 }
-
+                }
                 ++i;
             }
             if (i == 0)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse face entry: unknown format", severity::error);
+                return;
             }
             geometry.face_entries.push_back(e);
         };
@@ -253,6 +204,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         if (entries_count == 0)
         {
             on_error(data, cc::as_byte_span(line), "unable to parse face: no face entries found", severity::error);
+            return;
         }
 
         geometry.faces.push_back({entries_start, entries_count});
@@ -282,27 +234,41 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         {
             typename babel::obj::geometry<ScalarT>::line_entry e;
             int i = 0;
-            for (auto const idx : seg.split('/'))
+            for (auto const idx : seg.split('/', cc::split_options::keep_empty))
             {
-                if (i == 0)
+                switch (i)
                 {
+                case 0:
+                {
+                    if (idx.empty())
+                    {
+                        on_error(data, cc::as_byte_span(s), "unable to parse line entry: missing vertex index", severity::error);
+                        return;
+                    }
                     auto const vertex_idx = parse_int(idx);
                     if (vertex_idx < 0)
                         e.vertex_idx = int(geometry.vertices.size()) + vertex_idx;
                     else
                         e.vertex_idx = vertex_idx - 1;
                 }
-                else if (i == 1)
+                break;
+                case 1:
                 {
-                    auto const texture_idx = parse_int(idx);
-                    if (texture_idx < 0)
-                        e.tex_coord_idx = int(geometry.vertices.size()) + texture_idx;
-                    else
-                        e.tex_coord_idx = texture_idx - 1;
+                    if (!idx.empty())
+                    {
+                        auto const texture_idx = parse_int(idx);
+                        if (texture_idx < 0)
+                            e.tex_coord_idx = int(geometry.vertices.size()) + texture_idx;
+                        else
+                            e.tex_coord_idx = texture_idx - 1;
+                    }
                 }
-                else
+                break;
+                default:
                 {
                     on_error(data, cc::as_byte_span(s), "unable to parse line: unknown line segment format", severity::error);
+                    return;
+                }
                 }
                 ++i;
             }
@@ -313,6 +279,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         if (entries_count < 2)
         {
             on_error(data, cc::as_byte_span(s), "unable to parse line: a line segment must contain at least two points", severity::error);
+            return;
         }
         geometry.lines.push_back({entries_start, entries_count});
     };
@@ -339,7 +306,7 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             g.faces_count = faces_count;
         }
         if (points_count > 0 || lines_count > 0 || faces_count > 0)
-            for (auto const group : active_groups)
+            for (auto const& group : active_groups)
             {
                 g.name = group;
                 geometry.groups.push_back(g);
@@ -361,10 +328,13 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             active_groups.push_back(g);
     };
 
-    while (has_more_lines())
+    auto const data_as_string_view = cc::string_view(reinterpret_cast<char const*>(data.data()), reinterpret_cast<char const*>(data.data() + data.size()));
+    for (auto line : data_as_string_view.split('\n', cc::split_options::skip_empty))
     {
-        auto const line = next_line();
-        if (line.empty())
+        line = *line.split('#').begin(); // remove comments
+        line = line.trim();
+
+        if (line.empty() || line.starts_with('#'))
             continue;
 
         if (line[0] == 'v')
@@ -372,29 +342,35 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             if (line.size() < 2)
             {
                 on_error(data, cc::as_byte_span(line), "unable to parse line: starts with v but does not contain any vertex information", severity::error);
+                continue;
             }
             if (cc::is_blank(line[1]))
                 parse_vertex(line);
-            else if (line[1] == 't')
-                parse_texture_vertex(line);
-            else if (line[1] == 'n')
-                parse_vertex_normal(line);
-            else if (line[1] == 'p')
-                parse_parameter_space_vertex(line);
-            else if (cfg.add_unrecognized_lines)
-                geometry.unrecognized_lines.push_back(line);
+            else
+            {
+                if (line.size() < 3)
+                {
+                    on_error(data, cc::as_byte_span(line), "unable to parse line: starts with v but does not contain any vertex information", severity::error);
+                    continue;
+                }
+                if (line[1] == 't' && cc::is_blank(line[2]))
+                    parse_texture_vertex(line);
+                else if (line[1] == 'n' && cc::is_blank(line[2]))
+                    parse_vertex_normal(line);
+                else if (line[1] == 'p' && cc::is_blank(line[2]))
+                    parse_parameter_space_vertex(line);
+                else if (cfg.add_unrecognized_lines)
+                    geometry.unrecognized_lines.push_back(line);
+            }
         }
-        else if (line[0] == 'f')
+        else if (line[0] == 'f' && line.size() >= 2 && cc::is_blank(line[1]))
             parse_face(line);
-        else if (line[0] == 'p')
+        else if (line[0] == 'p' && line.size() >= 2 && cc::is_blank(line[1]))
             parse_point(line);
-        else if (line[0] == 'l')
+        else if (line[0] == 'l' && line.size() >= 2 && cc::is_blank(line[1]))
             parse_line(line);
-        else if (line[0] == 'g')
-        {
-            if (cfg.parse_groups)
-                parse_groups(line);
-        }
+        else if (line[0] == 'g' && line.size() >= 2 && cc::is_blank(line[1]) && cfg.parse_groups)
+            parse_groups(line);
         else if (cfg.add_unrecognized_lines)
             geometry.unrecognized_lines.push_back(line);
     }
