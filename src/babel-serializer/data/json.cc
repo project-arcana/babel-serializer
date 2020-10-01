@@ -104,7 +104,7 @@ cc::uint64 babel::json::json_ref::node::get_uint64() const
     return v;
 }
 
-void babel::json::detail::write_escaped_string(cc::stream_ref<char> output, cc::string_view s)
+void babel::json::detail::write_escaped_string(cc::string_stream_ref output, cc::string_view s)
 {
     // no realloc if nothing has to be escaped
     // TODO: for even better performance it might be faster to check if s needs escaping at all

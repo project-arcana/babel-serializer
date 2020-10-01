@@ -5,6 +5,7 @@
 
 #include <cstdint>
 
+#include <clean-core/format.hh>
 #include <clean-core/function_ptr.hh>
 #include <clean-core/function_ref.hh>
 #include <clean-core/string_view.hh>
@@ -352,6 +353,10 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data, read_co
             return {};
         }
         pts.points = parse_int(s.subview(7).trim());
+
+        if (pts.points != pts.width * pts.height)
+            on_error(data, cc::as_byte_span(s),
+                     cc::format("expected {} x {} = {} points but got {} points", pts.width, pts.height, pts.width * pts.height, pts.points), severity::warning);
     }
 
     // data
@@ -369,10 +374,8 @@ babel::pcd::point_cloud babel::pcd::read(cc::span<const std::byte> data, read_co
         if (s == "binary")
         {
             if (data.size() - pos != pts.data.size())
-            {
-                on_error(data, cc::as_byte_span(s), "DATA size mismatch", severity::warning);
-                return {};
-            }
+                on_error(data, cc::as_byte_span(s), cc::format("DATA size mismatch, expected {} B, got {} B", pts.data.size(), data.size() - pos),
+                         severity::warning);
 
             // just a raw copy
             std::memcpy(pts.data.data(), data.data() + pos, cc::min(pts.data.size(), data.size() - pos));

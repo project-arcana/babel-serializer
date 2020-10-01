@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdio>
+
 #include <clean-core/range_ref.hh>
 #include <clean-core/stream_ref.hh>
 #include <clean-core/string_view.hh>
@@ -8,6 +10,9 @@
 
 namespace babel::file
 {
+/// returns true if the file exists and can be read
+bool exists(cc::string_view filename);
+
 /// reads a file writes all bytes in the provided stream
 void read(cc::stream_ref<std::byte> out, cc::string_view filename, error_handler on_error = default_error_handler);
 
@@ -25,4 +30,19 @@ void write(cc::string_view filename, cc::string_view data, error_handler on_erro
 
 /// writes the given lines to a file
 void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines, cc::string_view line_ending = "\n", error_handler on_error = default_error_handler);
+
+/// an output file stream that can be used as cc::stream_ref<char>, cc::stream_ref<std::byte>, cc::string_stream_ref
+/// NOTE: overwrites existing files
+struct file_output_stream
+{
+    file_output_stream(cc::string_view filename);
+    ~file_output_stream() { fclose(file); }
+
+    void operator()(cc::string_view content) { fwrite(content.data(), 1, content.size(), file); }
+    void operator()(cc::span<char const> content) { fwrite(content.data(), 1, content.size(), file); }
+    void operator()(cc::span<std::byte const> content) { fwrite(content.data(), 1, content.size(), file); }
+
+private:
+    FILE* file = nullptr;
+};
 }
