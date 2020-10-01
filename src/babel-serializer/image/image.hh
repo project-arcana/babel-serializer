@@ -70,7 +70,7 @@ struct data_header
 struct data : data_header
 {
     // header via inheritance
-    cc::array<std::byte> data;
+    cc::array<std::byte> bytes;
 };
 
 /// reads an image from memory
