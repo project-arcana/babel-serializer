@@ -1,11 +1,15 @@
 #pragma once
 
+#include <cstddef> // std::byte
+
 #include <clean-core/map.hh>
 #include <clean-core/string.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/vector.hh>
 
 #include <typed-geometry/tg-lean.hh>
+
+#include <babel-serializer/errors.hh>
 
 namespace babel::obj
 {
@@ -48,6 +52,7 @@ struct geometry
     struct line_entry
     {
         int vertex_idx = -1;
+        int tex_coord_idx = -1;
     };
 
     struct point
@@ -68,7 +73,8 @@ struct geometry
         int points_start = 0;
         int points_count = 0;
 
-        // ...
+        // ... free form surfaces
+        // also: can vertices be part of groups?
     };
 
     // vertex data
@@ -87,4 +93,7 @@ struct geometry
 
     cc::vector<cc::string> unrecognized_lines;
 };
+
+geometry<float> read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
+geometry<double> read_double(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
 }
