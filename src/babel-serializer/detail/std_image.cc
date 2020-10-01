@@ -7418,8 +7418,8 @@ static void* babel_stbi__load_gif_main(babel_stbi__context* s, int** delays, int
         babel_stbi_uc* two_back = 0;
         babel_stbi__gif g;
         int stride;
-        int out_size = 0;
-        int delays_size = 0;
+        [[maybe_unused]] int out_size = 0;
+        [[maybe_unused]] int delays_size = 0;
         memset(&g, 0, sizeof(g));
         if (delays)
         {
