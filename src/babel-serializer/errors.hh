@@ -2,6 +2,7 @@
 
 #include <clean-core/function_ref.hh>
 #include <clean-core/span.hh>
+#include <clean-core/string_view.hh>
 
 namespace babel
 {
