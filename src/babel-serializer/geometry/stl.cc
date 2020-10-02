@@ -1,6 +1,7 @@
 #include "stl.hh"
 
 #include <cstring> // std::memcpy
+#include <limits>
 
 #include <clean-core/from_string.hh>
 #include <clean-core/typedefs.hh>
@@ -24,7 +25,7 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
         // unfortunately many binary stl also start with "solid"
         // also check for '\n' followed by "facet"
         int idx = -1;
-        for (size_t i = 0; data_as_string_view.size(); ++i)
+        for (size_t i = 0; i < data_as_string_view.size(); ++i)
         {
             if (data_as_string_view[i] == '\n')
             {
@@ -67,7 +68,7 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
         // the 10 comes from the bytes "COLOR=" and 4 RGBA bytes
         for (size_t i = 0; i < header.size() - 10; ++i)
         {
-            auto const sv = header.subspan(i, i + 10);
+            auto const sv = header.subspan(i, 10);
             auto const s = cc::string_view(reinterpret_cast<char const*>(sv.begin()), reinterpret_cast<char const*>(sv.end()));
             if (s.starts_with("COLOR="))
             {
@@ -162,14 +163,40 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
         tg::vec3 normal;
         tg::pos3 vertices[3];
         int current_vertex_idx = 0;
+
+        auto const is_space = [](char c) { return cc::is_space(c) || (static_cast<unsigned char>(c) >= static_cast<unsigned char>(128)); }; // treat non-ascii chars as space
+
+        auto const from_string = [](cc::string_view s, float& f) {
+            if (cc::from_string(s, f))
+                return true;
+            if (s.equals_ignore_case("nan"))
+            {
+                f = std::numeric_limits<float>::quiet_NaN();
+                return true;
+            }
+            else if (s.equals_ignore_case("inf") || s.equals_ignore_case("infinity"))
+            {
+                f = std::numeric_limits<float>::infinity();
+                return true;
+            }
+            else if (s.equals_ignore_case("-inf") || s.equals_ignore_case("-infinity"))
+            {
+                f = -std::numeric_limits<float>::infinity();
+                return true;
+            }
+            else
+                return false;
+        };
+
         for (auto line : data_as_string_view.split('\n', cc::split_options::skip_empty))
         {
-            line = line.trim();
+            line = line.trim(is_space);
             if (line.empty())
                 continue;
 
             if (line.starts_with("solid"))
             {
+                // note: do not use the local version of is_space here, because some files have unicode names
                 geometry.name = line.subview(5).trim(); // skip "solid"
             }
             else if (line.starts_with("facet normal"))
@@ -177,9 +204,9 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                 current_vertex_idx = 0;
                 auto const normal_entries = line.subview(12); // skip "facet_normal"
                 int i = 0;
-                for (auto normal_entry : normal_entries.split(cc::is_space, cc::split_options::skip_empty))
+                for (auto normal_entry : normal_entries.split(is_space, cc::split_options::skip_empty))
                 {
-                    if (!cc::from_string(normal_entry, normal[i++]))
+                    if (!from_string(normal_entry, normal[i++]))
                     {
                         on_error(data, cc::as_byte_span(normal_entry), "Failed to parse STL: Failed to read normal", severity::error);
                         continue;
@@ -194,9 +221,9 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             {
                 auto const vertex_entries = line.subview(6); // skip "vertex"
                 auto i = 0;
-                for (auto const vertex_entry : vertex_entries.split(cc::is_space, cc::split_options::skip_empty))
+                for (auto const vertex_entry : vertex_entries.split(is_space, cc::split_options::skip_empty))
                 {
-                    if (!cc::from_string(vertex_entry, vertices[current_vertex_idx][i++]))
+                    if (!from_string(vertex_entry, vertices[current_vertex_idx][i++]))
                     {
                         on_error(data, cc::as_byte_span(vertex_entry), "Failed to parse STL: Failed to read vertex", severity::error);
                         continue;
