@@ -44,7 +44,7 @@ struct geometry
         cc::uint8 a;
     };
 
-    /// The name is optional and always emtpy for binary STL files
+    /// The name is optional and always empty for binary STL files
     cc::string name;
     cc::vector<triangle> triangles;
     cc::vector<color> triangle_color;
