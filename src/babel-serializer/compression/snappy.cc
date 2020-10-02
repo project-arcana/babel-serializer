@@ -1,7 +1,5 @@
 #include "snappy.hh"
 
-#include <rich-log/log.hh>
-
 #include <snappy/snappy.h>
 
 cc::vector<std::byte> babel::snappy::compress(cc::span<std::byte const> data)
