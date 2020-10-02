@@ -38,10 +38,10 @@ struct geometry
 
     struct color
     {
-        std::byte r;
-        std::byte g;
-        std::byte b;
-        std::byte a;
+        cc::uint8 r;
+        cc::uint8 g;
+        cc::uint8 b;
+        cc::uint8 a;
     };
 
     /// The name is optional and always emtpy for binary STL files

@@ -60,7 +60,7 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             return data.subspan(last_pos, count);
         };
 
-        stl::geometry::color default_color = {std::byte(0.6 * 255), std::byte(0.6 * 255), std::byte(0.6 * 255), std::byte(255)};
+        stl::geometry::color default_color = {cc::uint8(0.6 * 255), cc::uint8(0.6 * 255), cc::uint8(0.6 * 255), cc::uint8(255)};
 
         auto const header = get_next(80);
         // check if this is Materialise Magics software style
@@ -73,10 +73,10 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             if (s.starts_with("COLOR="))
             {
                 is_materialize = true;
-                default_color.r = sv[6];
-                default_color.g = sv[7];
-                default_color.b = sv[8];
-                default_color.a = sv[9];
+                default_color.r = cc::uint8(sv[6]);
+                default_color.g = cc::uint8(sv[7]);
+                default_color.b = cc::uint8(sv[8]);
+                default_color.a = cc::uint8(sv[9]);
                 break;
             }
         }
@@ -136,17 +136,17 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                 auto& c = geometry.triangle_color[i];
                 if (is_materialize)
                 {
-                    c.r = std::byte((0x0F & (color >> 8)) << 4);
-                    c.g = std::byte((0x0F & (color >> 4)) << 4);
-                    c.b = std::byte((0x0F & (color >> 0)) << 4);
+                    c.r = cc::uint8((0x0F & (color >> 8)) << 4);
+                    c.g = cc::uint8((0x0F & (color >> 4)) << 4);
+                    c.b = cc::uint8((0x0F & (color >> 0)) << 4);
                 }
                 else
                 {
-                    c.r = std::byte((0x0F & (color >> 0)) << 4);
-                    c.g = std::byte((0x0F & (color >> 4)) << 4);
-                    c.b = std::byte((0x0F & (color >> 8)) << 4);
+                    c.r = cc::uint8((0x0F & (color >> 0)) << 4);
+                    c.g = cc::uint8((0x0F & (color >> 4)) << 4);
+                    c.b = cc::uint8((0x0F & (color >> 8)) << 4);
                 }
-                c.a = std::byte(255);
+                c.a = cc::uint8(255);
             }
             else
             {
