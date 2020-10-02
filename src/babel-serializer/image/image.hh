@@ -57,8 +57,8 @@ struct write_config
 
 struct data_header
 {
-    channels channels = channels::invalid;
-    bit_depth bit_depth = bit_depth::invalid;
+    image::channels channels = channels::invalid;
+    image::bit_depth bit_depth = bit_depth::invalid;
     int width = 1;
     int height = 1;
     int depth = 1;
