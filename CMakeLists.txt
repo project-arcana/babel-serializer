@@ -8,10 +8,15 @@ endif()
 # =========================================
 # define library
 
-file(GLOB_RECURSE SOURCES "src/*.cc" "extern/*.cc" "extern/*.c")
-file(GLOB_RECURSE HEADERS "src/*.hh" "extern/*.h")
+file(GLOB_RECURSE SOURCES "src/*.cc")
+file(GLOB_RECURSE HEADERS "src/*.hh")
+
+file(GLOB_RECURSE EXTERN_SOURCES "extern/*.cc" "extern/*.c")
+file(GLOB_RECURSE EXTERN_HEADERS "extern/*.h")
 
 arcana_add_library(BABEL babel-serializer SOURCES HEADERS)
+
+target_sources(babel-serializer PRIVATE ${EXTERN_SOURCES} ${EXTERN_HEADERS})
 
 target_include_directories(babel-serializer PUBLIC src/)
 target_include_directories(babel-serializer PRIVATE extern/)
