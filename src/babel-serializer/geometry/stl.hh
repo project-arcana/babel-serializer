@@ -23,6 +23,8 @@ struct read_config
     file_type file_type = file_type::autodetect;
 };
 
+/// See: https://en.wikipedia.org/wiki/STL_(file_format)
+/// We accept colors in VisCAM and SolidView, as well as Materialise Magics format
 struct geometry
 {
     /// right-hand-rule triangles with normal information
@@ -42,6 +44,7 @@ struct geometry
         std::byte a;
     };
 
+    /// The name is optional and always emtpy for binary STL files
     cc::string name;
     cc::vector<triangle> triangles;
     cc::vector<color> triangle_color;
