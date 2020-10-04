@@ -35,14 +35,24 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 /// NOTE: overwrites existing files
 struct file_output_stream
 {
+    file_output_stream(char const* filename);
     file_output_stream(cc::string_view filename);
-    ~file_output_stream() { fclose(file); }
 
-    void operator()(cc::string_view content) { fwrite(content.data(), 1, content.size(), file); }
-    void operator()(cc::span<char const> content) { fwrite(content.data(), 1, content.size(), file); }
-    void operator()(cc::span<std::byte const> content) { fwrite(content.data(), 1, content.size(), file); }
+    ~file_output_stream()
+    {
+        if (_file)
+        {
+            std::fclose(_file);
+        }
+    }
+
+    void operator()(cc::string_view content) { fwrite(content.data(), 1, content.size(), _file); }
+    void operator()(cc::span<char const> content) { fwrite(content.data(), 1, content.size(), _file); }
+    void operator()(cc::span<std::byte const> content) { fwrite(content.data(), 1, content.size(), _file); }
+
+    bool valid() const { return _file != nullptr; }
 
 private:
-    FILE* file = nullptr;
+    FILE* _file = nullptr;
 };
 }

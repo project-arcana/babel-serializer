@@ -1,10 +1,11 @@
 #include "file.hh"
 
+#include <fstream>
+
 #include <clean-core/array.hh>
 #include <clean-core/format.hh>
+#include <clean-core/macros.hh>
 #include <clean-core/string.hh>
-
-#include <fstream>
 
 void babel::file::read(cc::stream_ref<std::byte> out, cc::string_view filename, error_handler on_error)
 {
@@ -103,4 +104,15 @@ bool babel::file::exists(cc::string_view filename)
     return std::ifstream(cc::string(filename).c_str()).good();
 }
 
-babel::file::file_output_stream::file_output_stream(cc::string_view filename) { fopen(cc::string(filename).c_str(), "wb"); }
+babel::file::file_output_stream::file_output_stream(const char* filename)
+{
+#ifdef CC_OS_WINDOWS
+    errno_t err = ::fopen_s(&_file, filename, "wb");
+    if (err != 0)
+        _file = nullptr;
+#else
+    _file = std::fopen(filename, "wb");
+#endif
+}
+
+babel::file::file_output_stream::file_output_stream(cc::string_view filename) : file_output_stream(cc::string(filename).c_str()) {}
