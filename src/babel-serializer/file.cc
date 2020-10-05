@@ -42,25 +42,7 @@ cc::string babel::file::read_all_text(cc::string_view filename, babel::error_han
     return result;
 }
 
-cc::array<std::byte> babel::file::read_all_bytes(cc::string_view filename, babel::error_handler on_error)
-{
-    std::ifstream file(cc::string(filename).c_str(), std::ios_base::binary);
-    if (!file)
-    {
-        on_error({}, {}, cc::format("file '{}' could not be read", filename), severity::error);
-        return {};
-    }
-
-    file.seekg(0, std::ios_base::end);
-    auto size = file.tellg();
-    file.seekg(0, std::ios_base::beg);
-
-    auto result = cc::array<std::byte>::uninitialized(size);
-    file.read(reinterpret_cast<char*>(result.data()), size);
-    return result;
-}
-
-cc::alloc_array<char> babel::file::read_all_text_alloc(const char* filename, cc::allocator* alloc, babel::error_handler on_error)
+cc::alloc_array<char> babel::file::read_all_text(const char* filename, cc::allocator* alloc, babel::error_handler on_error)
 {
 #ifdef CC_OS_WINDOWS
     std::FILE* fp = nullptr;
@@ -86,9 +68,57 @@ cc::alloc_array<char> babel::file::read_all_text_alloc(const char* filename, cc:
     return res;
 }
 
-cc::alloc_array<char> babel::file::read_all_text_alloc(cc::string_view filename, cc::allocator* alloc, babel::error_handler on_error)
+cc::alloc_array<char> babel::file::read_all_text(cc::string_view filename, cc::allocator* alloc, babel::error_handler on_error)
 {
-    return read_all_text_alloc(cc::string(filename).c_str(), alloc, on_error);
+    return read_all_text(cc::string(filename).c_str(), alloc, on_error);
+}
+
+cc::array<std::byte> babel::file::read_all_bytes(cc::string_view filename, babel::error_handler on_error)
+{
+    std::ifstream file(cc::string(filename).c_str(), std::ios_base::binary);
+    if (!file)
+    {
+        on_error({}, {}, cc::format("file '{}' could not be read", filename), severity::error);
+        return {};
+    }
+
+    file.seekg(0, std::ios_base::end);
+    auto size = file.tellg();
+    file.seekg(0, std::ios_base::beg);
+
+    auto result = cc::array<std::byte>::uninitialized(size);
+    file.read(reinterpret_cast<char*>(result.data()), size);
+    return result;
+}
+
+cc::alloc_array<std::byte> babel::file::read_all_bytes(const char* filename, cc::allocator* alloc, babel::error_handler on_error)
+{
+#ifdef CC_OS_WINDOWS
+    std::FILE* fp = nullptr;
+    errno_t err = ::fopen_s(&fp, filename, "rb");
+    if (err != 0)
+        fp = nullptr;
+#else
+    std::FILE* fp = std::fopen(filename, "rb");
+#endif
+
+    if (!fp)
+    {
+        on_error({}, {}, cc::format("file '{}' could not be read", filename), severity::error);
+        return {};
+    }
+
+    std::fseek(fp, 0, SEEK_END);
+    auto res = cc::alloc_array<std::byte>::uninitialized(std::ftell(fp), alloc);
+    std::rewind(fp);
+    std::fread(&res[0], 1, res.size(), fp);
+    std::fclose(fp);
+    return res;
+}
+
+cc::alloc_array<std::byte> babel::file::read_all_bytes(cc::string_view filename, cc::allocator* alloc, babel::error_handler on_error)
+{
+    return read_all_bytes(cc::string(filename).c_str(), alloc, on_error);
 }
 
 
