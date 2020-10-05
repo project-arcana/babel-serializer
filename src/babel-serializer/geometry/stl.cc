@@ -24,15 +24,7 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
 
         // unfortunately many binary stl also start with "solid"
         // also check for '\n' followed by "facet"
-        int idx = -1;
-        for (size_t i = 0; i < data_as_string_view.size(); ++i)
-        {
-            if (data_as_string_view[i] == '\n')
-            {
-                idx = int(i);
-                break;
-            }
-        }
+        auto const idx = data_as_string_view.index_of('\n');
         if (idx < 0)
             return false;
 
