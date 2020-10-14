@@ -4,54 +4,12 @@
 
 #include <clean-core/from_string.hh>
 
+#include <babel-serializer/data/escape.hh>
+
 cc::string babel::json::json_ref::node::get_string() const
 {
     CC_ASSERT(is_string());
-
-    // strip '"'
-    auto sv = token.subview(1, token.size() - 2);
-
-    // unescape
-    cc::string r;
-    r.reserve(sv.size());
-    for (size_t i = 0; i < sv.size(); ++i)
-    {
-        auto c = sv[i];
-        if (c == '\\' && i + 1 < sv.size())
-        {
-            switch (sv[i + 1])
-            {
-            case 'b':
-                r += '\b';
-                break;
-            case 'f':
-                r += '\f';
-                break;
-            case 'n':
-                r += '\n';
-                break;
-            case 'r':
-                r += '\r';
-                break;
-            case 't':
-                r += '\t';
-                break;
-            case '\"':
-                r += '\"';
-                break;
-            case '\\':
-                r += '\\';
-                break;
-            default:
-                // TODO: better error handling
-                CC_UNREACHABLE("unknown escape");
-            }
-            ++i;
-        }
-        else
-            r += c;
-    }
-    return r;
+    return babel::unescape_json_string(token);
 }
 
 int babel::json::json_ref::node::get_int() const
@@ -106,45 +64,7 @@ cc::uint64 babel::json::json_ref::node::get_uint64() const
 
 void babel::json::detail::write_escaped_string(cc::string_stream_ref output, cc::string_view s)
 {
-    // no realloc if nothing has to be escaped
-    // TODO: for even better performance it might be faster to check if s needs escaping at all
-    cc::string r;
-    r.reserve(s.size() + 2);
-
-    r += '"';
-    for (auto c : s)
-    {
-        switch (c)
-        {
-        case '\b':
-            r += "\\b";
-            break;
-        case '\f':
-            r += "\\f";
-            break;
-        case '\r':
-            r += "\\r";
-            break;
-        case '\n':
-            r += "\\n";
-            break;
-        case '\t':
-            r += "\\t";
-            break;
-        case '\"':
-            r += "\\\"";
-            break;
-        case '\\':
-            r += "\\\\";
-            break;
-        default:
-            r += c;
-            break;
-        }
-    }
-    r += '"';
-
-    output << r;
+    output << babel::escape_json_string(s);
 }
 
 namespace babel::json
