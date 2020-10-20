@@ -20,7 +20,7 @@ enum class file_type
 };
 struct read_config
 {
-    file_type file_type = file_type::autodetect;
+    babel::stl::file_type file_type = file_type::autodetect;
 };
 
 /// See: https://en.wikipedia.org/wiki/STL_(file_format)
