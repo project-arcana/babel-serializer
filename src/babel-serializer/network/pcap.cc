@@ -5,8 +5,7 @@ babel::pcap::data babel::pcap::read(cc::span<const std::byte> data, read_config 
 {
     babel::pcap::data r;
 
-    // TODO: error handling
-    (void)on_error;
+    // TODO: more error handling
 
     // copy raw data
     if (!cfg.view_only)
@@ -41,6 +40,9 @@ babel::pcap::data babel::pcap::read(cc::span<const std::byte> data, read_config 
 
         pos += header.incl_len;
     }
+
+    if (pos != data.size())
+        on_error(data, {}, "last packet defined more data than actually provided", severity::warning);
 
     return r;
 }

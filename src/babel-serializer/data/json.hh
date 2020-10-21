@@ -87,6 +87,7 @@ struct json_ref
     /// a single node in a json tree
     /// NOTE: objects are have twice as many children as could be expected
     ///       they are actually pairs of key (string) -> value (json)
+    /// IMPORTANT: children are NOT contiguous, one need to use next_sibling
     struct node
     {
         // TODO: type in a separate array would save some space
