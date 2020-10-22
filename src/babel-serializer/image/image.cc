@@ -85,7 +85,9 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     CC_ASSERT(!cfg.format.empty() && "must provide a format");
     CC_ASSERT(img.is_valid());
 
-    auto expected_size = img.width * img.height * img.depth * bit_depth_byte_size(img.bit_depth);
+    auto channel_cnt = int(img.channels);
+
+    auto expected_size = img.width * img.height * img.depth * bit_depth_byte_size(img.bit_depth) * channel_cnt;
     CC_ASSERTF(expected_size == int(data.size()), "image data size is not what is expected (expected {}, got {})", expected_size, data.size());
 
     auto write_func = +[](void* ctx, void* data, int size) {
@@ -98,8 +100,8 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     if (cfg.format == "png")
     {
         CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
-        if (!babel_stbi_write_png_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data(),
-                                          int(img.channels) * img.width * img.height * bit_depth_byte_size(img.bit_depth)))
+        if (!babel_stbi_write_png_to_func(write_func, &output, img.width, img.height, channel_cnt, data.data(),
+                                          channel_cnt * img.width * bit_depth_byte_size(img.bit_depth)))
         {
             on_error({}, {}, babel_stbi_failure_reason(), severity::error);
             return false;
@@ -108,7 +110,7 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     else if (cfg.format == "bmp")
     {
         CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
-        if (!babel_stbi_write_bmp_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data()))
+        if (!babel_stbi_write_bmp_to_func(write_func, &output, img.width, img.height, channel_cnt, data.data()))
         {
             on_error({}, {}, babel_stbi_failure_reason(), severity::error);
             return false;
@@ -117,7 +119,7 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     else if (cfg.format == "tga")
     {
         CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
-        if (!babel_stbi_write_tga_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data()))
+        if (!babel_stbi_write_tga_to_func(write_func, &output, img.width, img.height, channel_cnt, data.data()))
         {
             on_error({}, {}, babel_stbi_failure_reason(), severity::error);
             return false;
@@ -126,7 +128,7 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     else if (cfg.format == "jpg")
     {
         CC_ASSERT(img.bit_depth == bit_depth::u8 && "currently only 8bit supported");
-        if (!babel_stbi_write_jpg_to_func(write_func, &output, img.width, img.height, int(img.channels), data.data(), cfg.jpg_quality))
+        if (!babel_stbi_write_jpg_to_func(write_func, &output, img.width, img.height, channel_cnt, data.data(), cfg.jpg_quality))
         {
             on_error({}, {}, babel_stbi_failure_reason(), severity::error);
             return false;
@@ -135,7 +137,7 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     else if (cfg.format == "hdr")
     {
         CC_ASSERT(img.bit_depth == bit_depth::f32 && "currently only 32bit float supported");
-        if (!babel_stbi_write_hdr_to_func(write_func, &output, img.width, img.height, int(img.channels), reinterpret_cast<float const*>(data.data())))
+        if (!babel_stbi_write_hdr_to_func(write_func, &output, img.width, img.height, channel_cnt, reinterpret_cast<float const*>(data.data())))
         {
             on_error({}, {}, babel_stbi_failure_reason(), severity::error);
             return false;
