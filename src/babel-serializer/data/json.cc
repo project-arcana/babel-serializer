@@ -62,10 +62,7 @@ cc::uint64 babel::json::json_ref::node::get_uint64() const
     return v;
 }
 
-void babel::json::detail::write_escaped_string(cc::string_stream_ref output, cc::string_view s)
-{
-    output << babel::escape_json_string(s);
-}
+void babel::json::detail::write_escaped_string(cc::string_stream_ref output, cc::string_view s) { output << babel::escape_json_string(s); }
 
 namespace babel::json
 {

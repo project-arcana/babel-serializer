@@ -19,7 +19,7 @@ int babel::source_map::line_of(const char* c) const
 
         ++idx;
     }
-    return _lines.size() - 1;
+    return int(_lines.size() - 1);
 }
 
 void babel::source_map::parse(cc::string_view source)
@@ -31,7 +31,7 @@ void babel::source_map::parse(cc::string_view source)
         return;
 
     char const* line_start = source.begin();
-    for (auto& c : source)
+    for (auto const& c : source)
     {
         if (c == '\n')
         {
