@@ -81,23 +81,21 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
     geometry geometry;
 
     auto const parse_type = [](cc::string_view s) -> type {
-        if (s == "char")
+        if (s == "char" || s == "int8")
             return type::char_t;
-        if (s == "uchar")
+        if (s == "uchar" || s == "uint8")
             return type::uchar_t;
-        if (s == "short")
+        if (s == "short" || s == "int16")
             return type::short_t;
-        if (s == "ushort")
+        if (s == "ushort" || s == "uint16")
             return type::ushort_t;
-        if (s == "int")
+        if (s == "int" || s == "int32")
             return type::int_t;
-        if (s == "uint")
+        if (s == "uint" || s == "uint32")
             return type::uint_t;
-        if (s == "short")
-            return type::short_t;
-        if (s == "float")
+        if (s == "float" || s == "float32")
             return type::float_t;
-        if (s == "double")
+        if (s == "double" || s == "float64" || s == "double64")
             return type::double_t;
         return type::invalid;
     };
@@ -135,17 +133,17 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
         }
 
         { // parse elements and properties
-
-            // keep track of the size to determine the start of each element in data
-            auto total_data_size = 0;
-            cc::string_view line = next_line();
-            while (line != "end_header")
+            while (true)
             {
                 if (!has_more_lines())
                 {
-                    on_error(data, cc::as_byte_span(line), "Failed to parse ply header: Unexpected end of file", severity::error);
+                    on_error(data, data.last(0), "Failed to parse ply header: Unexpected end of file", severity::error);
                     return {};
                 }
+                auto const line = next_line();
+
+                if (line == "end_header")
+                    break;
 
                 if (line.starts_with("comment"))
                     continue; // ignore comments
@@ -199,8 +197,6 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
 
                     geometry.elements.back().properties_count++;
                     auto& property = geometry.properties.emplace_back();
-                    property.data_start = total_data_size;
-                    property.data_stride = 0;
 
                     bool is_list = false;
                     int idx = 0;
@@ -274,20 +270,11 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                         on_error(data, cc::as_byte_span(line), "Failed to parse ply header: Invalid property!", severity::error);
                         return {};
                     }
-
-                    // increase stride of all propertys that belong to the current element
-                    auto const property_size = property.is_list() ? int(sizeof(geometry::list_property_entry)) : int(size_of(property.type));
-                    auto const& element = geometry.elements.back();
-                    for (auto i = 0; i < element.properties_count; ++i)
-                        geometry.properties[element.properties_start + i].data_stride += property_size;
                 }
-
                 else
                 {
                     on_error(data, cc::as_byte_span(line), "Failed to parse ply header: Unknown line!", severity::warning);
                 }
-
-                line = next_line();
             }
         }
     }
@@ -302,70 +289,54 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
             auto const parse_i8 = [&](cc::string_view s) -> cc::int8 {
                 cc::int8 i = 0;
                 if (!cc::from_string(s, i))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse char!", severity::error);
-                }
                 return i;
             };
             auto const parse_u8 = [&](cc::string_view s) -> cc::uint8 {
                 cc::uint8 u = 0;
                 if (!cc::from_string(s, u))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse uchar!", severity::error);
-                }
                 return u;
             };
             auto const parse_i16 = [&](cc::string_view s) -> cc::int16 {
                 cc::int16 i = 0;
                 if (!cc::from_string(s, i))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse short!", severity::error);
-                }
                 return i;
             };
             auto const parse_u16 = [&](cc::string_view s) -> cc::uint16 {
                 cc::uint16 u = 0;
                 if (!cc::from_string(s, u))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse ushort!", severity::error);
-                }
                 return u;
             };
             auto const parse_i32 = [&](cc::string_view s) -> cc::int32 {
                 cc::int32 i = 0;
                 if (!cc::from_string(s, i))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse int!", severity::error);
-                }
                 return i;
             };
             auto const parse_u32 = [&](cc::string_view s) -> cc::uint32 {
                 cc::uint32 u = 0;
                 if (!cc::from_string(s, u))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse uint!", severity::error);
-                }
                 return u;
             };
             auto const parse_f32 = [&](cc::string_view s) -> cc::float32 {
                 cc::float32 f = 0;
                 if (!cc::from_string(s, f))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse float!", severity::error);
-                }
                 return f;
             };
             auto const parse_f64 = [&](cc::string_view s) -> cc::float64 {
                 cc::float64 f = 0;
                 if (!cc::from_string(s, f))
-                {
                     on_error(data, cc::as_byte_span(s), "Failed to parse double!", severity::error);
-                }
                 return f;
             };
 
             auto const append_data = [&](auto const& v) {
-                CC_ASSERT(data_idx + sizeof(v) < geometry.data.size());
+                CC_ASSERT(data_idx + sizeof(v) <= geometry.data.size());
                 std::memcpy(&geometry.data[data_idx], &v, sizeof(v));
                 data_idx += sizeof(v);
             };
@@ -374,58 +345,34 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                 switch (t)
                 {
                 case type::char_t:
-                {
-                    auto const i = parse_i8(s);
-                    append_data(i);
+                    append_data(parse_i8(s));
                     break;
-                }
                 case type::uchar_t:
-                {
-                    auto const i = parse_u8(s);
-                    append_data(i);
+                    append_data(parse_u8(s));
                     break;
-                }
                 case type::short_t:
-                {
-                    auto const i = parse_i16(s);
-                    append_data(i);
+                    append_data(parse_i16(s));
                     break;
-                }
                 case type::ushort_t:
-                {
-                    auto const i = parse_u16(s);
-                    append_data(i);
+                    append_data(parse_u16(s));
                     break;
-                }
                 case type::int_t:
-                {
-                    auto const i = parse_i32(s);
-                    append_data(i);
+                    append_data(parse_i32(s));
                     break;
-                }
                 case type::uint_t:
-                {
-                    auto const i = parse_u32(s);
-                    append_data(i);
+                    append_data(parse_u32(s));
                     break;
-                }
                 case type::float_t:
-                {
-                    auto const f = parse_f32(s);
-                    append_data(f);
+                    append_data(parse_f32(s));
                     break;
-                }
                 case type::double_t:
-                {
-                    auto const f = parse_f64(s);
-                    append_data(f);
+                    append_data(parse_f64(s));
                     break;
-                }
-                default:
+                case type::invalid:
                     CC_UNREACHABLE("Invalid data type");
+                    break;
                 }
             };
-
 
             for (auto const& e : geometry.elements)
             {
@@ -436,6 +383,7 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                         on_error(data, data.last(0), "Failed to parse ply: Unexpected end of file!", severity::error);
                         return geometry;
                     }
+                    // line tokenizer
                     auto const line = next_line();
                     auto it = line.split().begin();
                     auto const end = line.split().end();
@@ -456,42 +404,42 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                     for (auto p_idx = 0; p_idx < e.properties_count; ++p_idx)
                     {
                         auto const& p = geometry.properties[e.properties_start + p_idx];
-                        if (p.list_size_type != type::invalid)
+                        if (p.is_list())
                         {
+                            geometry::list_property_entry list_element;
+                            list_element.start_idx = int(geometry.list_data.size());
+                            list_element.size = 0;
                             auto const list_size_s = next_token();
-                            cc::int64 list_size = 0; // large enough size
-                            // this is probably unnecessary for ascii files as they should all be valid integer
+                            // We can probably ignore the list size type for ascii
                             switch (p.list_size_type)
                             {
                             case type::char_t:
-                                list_size = parse_i8(list_size_s);
+                                list_element.size = parse_i8(list_size_s);
                                 break;
                             case type::uchar_t:
-                                list_size = parse_u8(list_size_s);
+                                list_element.size = parse_u8(list_size_s);
                                 break;
                             case type::short_t:
-                                list_size = parse_i16(list_size_s);
+                                list_element.size = parse_i16(list_size_s);
                                 break;
                             case type::ushort_t:
-                                list_size = parse_u16(list_size_s);
+                                list_element.size = parse_u16(list_size_s);
                                 break;
                             case type::int_t:
-                                list_size = parse_i32(list_size_s);
+                                list_element.size = parse_i32(list_size_s);
                                 break;
                             case type::uint_t:
-                                list_size = parse_u32(list_size_s);
+                                list_element.size = parse_u32(list_size_s);
                                 break;
                             default:
                                 CC_UNREACHABLE("List size type must be an integer type");
                             }
-                            if (list_size < 0)
+                            if (list_element.size < 0)
                             {
                                 on_error(data, cc::as_byte_span(list_size_s), "Failed to parse ply: List size cannot be negative!", severity::error);
-                                list_size = 0;
                             }
-                            geometry::list_property_entry list_element;
-                            list_element.start_idx = int(geometry.list_data.size());
-                            for (auto l = 0; l < list_size; ++l)
+
+                            for (auto l = 0; l < list_element.size; ++l)
                             {
                                 auto const s = next_token();
                                 switch (p.type)
@@ -548,7 +496,6 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                                     CC_UNREACHABLE("Invalid data type");
                                 }
                             }
-                            list_element.size = int(geometry.list_data.size()) - list_element.start_idx;
                             append_data(list_element);
                         }
                         else
@@ -579,7 +526,7 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
             };
 
             auto const read_next = [&](size_t n) -> cc::span<std::byte const> {
-                if (pos + n >= data.size())
+                if (pos + n > data.size())
                 {
                     on_error(data, data.last(0), "Failed to parse ply: Unexpected end of file!", severity::error);
                     return {};
@@ -593,79 +540,89 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
             };
 
             auto const append_data = [&](cc::span<std::byte const> d) {
-                CC_ASSERT(data_idx + d.size() < data.size());
+                CC_ASSERT(data_idx + d.size() <= geometry.data.size());
                 copy(d, cc::span(&geometry.data[data_idx], d.size()));
+                data_idx += d.size();
+            };
+            auto const append_data_raw = [&](cc::span<std::byte const> d) {
+                CC_ASSERT(data_idx + d.size() <= geometry.data.size());
+                d.copy_to(cc::span(&geometry.data[data_idx], d.size()));
                 data_idx += d.size();
             };
 
             for (auto const& e : geometry.elements)
             {
                 for (auto i = 0; i < e.count; ++i)
-                {
-                    auto const& p = geometry.properties[e.properties_start + i];
-
-                    if (p.is_list())
+                    for (auto p_idx = 0; p_idx < e.properties_count; ++p_idx)
                     {
-                        geometry::list_property_entry list_property;
-                        list_property.start_idx = int(geometry.list_data.size());
-                        list_property.size = 0;
-                        auto const raw = read_next(size_of(p.list_size_type));
-                        switch (p.list_size_type)
-                        {
-                        case type::char_t:
-                            list_property.size = cc::int8(raw[0]);
-                            break;
-                        case type::uchar_t:
-                            list_property.size = cc::uint8(raw[0]);
-                            break;
-                        case type::short_t:
-                        {
-                            cc::int16 i;
-                            copy(raw, cc::as_byte_span(i));
-                            list_property.size = i;
-                        }
-                        case type::ushort_t:
-                        {
-                            cc::uint16 i;
-                            copy(raw, cc::as_byte_span(i));
-                            list_property.size = i;
-                        }
-                        case type::int_t:
-                        {
-                            cc::int32 i;
-                            copy(raw, cc::as_byte_span(i));
-                            list_property.size = i;
-                        }
-                        case type::uint_t:
-                        {
-                            cc::uint32 i;
-                            copy(raw, cc::as_byte_span(i));
-                            list_property.size = i;
-                        }
-                        default:
-                            CC_UNREACHABLE("List size type must be integer");
-                        }
+                        auto const& p = geometry.properties[e.properties_start + p_idx];
 
-                        if (list_property.size < 0)
+                        if (p.is_list())
                         {
-                            on_error(data, raw, "List size cannot be negative!", severity::error);
+                            geometry::list_property_entry list_property;
+                            list_property.start_idx = int(geometry.list_data.size());
                             list_property.size = 0;
+                            auto const raw = read_next(size_of(p.list_size_type));
+                            switch (p.list_size_type)
+                            {
+                            case type::char_t:
+                                list_property.size = cc::int8(raw[0]);
+                                break;
+                            case type::uchar_t:
+                                list_property.size = cc::uint8(raw[0]);
+                                break;
+                            case type::short_t:
+                            {
+                                cc::int16 i;
+                                copy(raw, cc::as_byte_span(i));
+                                list_property.size = i;
+                                break;
+                            }
+                            case type::ushort_t:
+                            {
+                                cc::uint16 i;
+                                copy(raw, cc::as_byte_span(i));
+                                list_property.size = i;
+                                break;
+                            }
+                            case type::int_t:
+                            {
+                                cc::int32 i;
+                                copy(raw, cc::as_byte_span(i));
+                                list_property.size = i;
+                                break;
+                            }
+                            case type::uint_t:
+                            {
+                                cc::uint32 i;
+                                copy(raw, cc::as_byte_span(i));
+                                list_property.size = i;
+                                break;
+                            }
+                            default:
+                                CC_UNREACHABLE("List size type must be integer");
+                            }
+
+                            if (list_property.size < 0)
+                            {
+                                on_error(data, raw, "List size cannot be negative!", severity::error);
+                                list_property.size = 0;
+                            }
+                            geometry.list_data.resize(geometry.list_data.size() + list_property.size * size_of(p.type));
+                            for (auto l = 0; l < list_property.size; ++l)
+                            {
+                                auto const src = read_next(size_of(p.type));
+                                auto const dst = cc::span(&geometry.list_data[list_property.start_idx + l * size_of(p.type)], size_of(p.type));
+                                copy(src, dst);
+                            }
+                            // raw, because endianness is already correct
+                            append_data_raw(cc::as_byte_span(list_property));
                         }
-                        geometry.list_data.resize(geometry.list_data.size() + list_property.size * size_of(p.type));
-                        for (auto l = 0; l < list_property.size; ++l)
+                        else
                         {
-                            auto const src = read_next(size_of(p.type));
-                            auto const dst = cc::span(&geometry.list_data[list_property.start_idx], size_of(p.type));
-                            copy(src, dst);
+                            append_data(read_next(size_of(p.type)));
                         }
-                        list_property.size = int(geometry.list_data.size()) - list_property.start_idx;
-                        append_data(cc::as_byte_span(list_property));
                     }
-                    else
-                    {
-                        append_data(read_next(size_of(p.type)));
-                    }
-                }
             }
         }
     }
@@ -716,6 +673,49 @@ cc::span<const babel::ply::geometry::property> babel::ply::geometry::get_propert
 {
     auto const& e = get_element(element_name);
     return cc::span(&properties[e.properties_start], e.properties_count);
+}
+
+size_t babel::ply::geometry::size_in_bytes(element const& element) const
+{
+    size_t size = 0;
+    for (auto i = 0; i < element.properties_count; ++i)
+    {
+        auto const& p = properties[element.properties_start + i];
+        if (p.is_list())
+            size += sizeof(list_property_entry);
+        else
+            size += size_of(p.type);
+    }
+
+    return size;
+}
+
+size_t babel::ply::geometry::offset_of(element const& element, property const& property) const
+{
+    size_t offset = 0;
+    for (auto i = 0; i < element.properties_count; ++i)
+    {
+        auto const& p = properties[element.properties_start + i];
+        if (p.name == property.name)
+            return offset;
+        if (p.is_list())
+            offset += sizeof(list_property_entry);
+        else
+            offset += size_of(p.type);
+    }
+    CC_UNREACHABLE("propery does not exist");
+}
+
+size_t babel::ply::geometry::data_start_index(element const& element, property const& property) const
+{
+    size_t start_index = 0;
+    for (auto const& e : elements)
+    {
+        if (element.name == e.name)
+            return start_index + offset_of(element, property);
+        start_index += size_in_bytes(e) * e.count;
+    }
+    CC_UNREACHABLE("element does not exist");
 }
 
 babel::ply::geometry::property& babel::ply::geometry::get_property(babel::ply::geometry::element const& element, cc::string_view name)

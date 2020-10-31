@@ -51,15 +51,11 @@ struct geometry
     /// A ply property definition with a 'name' and a 'type'.
     /// A property is a list if 'list_size_type' is NOT invalid
     /// A properties data is stored in 'data'
-    /// If a property is a list data only stores a list_property_entry which
-    /// contains indices pointing into 'list_data'
     struct property
     {
         cc::string name;
         type type = type::invalid;
         enum type list_size_type = type::invalid;
-        int data_start = -1;  // start index pointing into data
-        int data_stride = -1; // stride in bytes
 
         constexpr bool is_list() const { return list_size_type != type::invalid; }
     };
@@ -96,30 +92,47 @@ public: // api
     template <class T>
     cc::strided_span<T> get_data(element const& element, property const& property)
     {
-        if constexpr (std::is_same_v<T, list_property_entry>)
-            CC_ASSERT(property.is_list());
-        return {&data[property.data_start], element.count, property.data_stride};
+        CC_ASSERT(property.is_list() == (std::is_same_v<T, list_property_entry>)&&"Lists must be read as 'list_property_entry'");
+        return {reinterpret_cast<T*>(&(data[data_start_index(element, property)])), size_t(element.count), cc::int64(size_in_bytes(element))};
     }
 
     template <class T>
     cc::strided_span<T const> get_data(element const& element, property const& property) const
     {
-        if constexpr (std::is_same_v<T, list_property_entry>)
-            CC_ASSERT(property.is_list());
-        return {&data[property.data_start], element.count, property.data_stride};
+        CC_ASSERT(property.is_list() == (std::is_same_v<T, list_property_entry const>)&&"Lists must be read as 'list_property_entry'");
+        return {reinterpret_cast<T const*>(&(data[data_start_index(element, property)])), size_t(element.count), cc::int64(size_in_bytes(element))};
+    }
+
+    cc::strided_span<list_property_entry> get_list_entries(element const& element, property const& property)
+    {
+        return get_data<list_property_entry>(element, property);
+    }
+
+    cc::strided_span<list_property_entry const> get_list_entries(element const& element, property const& property) const
+    {
+        return get_data<list_property_entry const>(element, property);
     }
 
     template <class T>
     cc::span<T> get_data(list_property_entry const& list)
     {
-        return {&list_data[list.start_idx], list.size};
+        return {reinterpret_cast<T*>(&list_data[list.start_idx]), size_t(list.size)};
     }
 
     template <class T>
     cc::span<T const> get_data(list_property_entry const& list) const
     {
-        return {&list_data[list.start_idx], list.size};
+        return {reinterpret_cast<T const*>(&list_data[list.start_idx]), size_t(list.size)};
     }
+
+    /// returns the sum of the byte sizes of the elements properties
+    size_t size_in_bytes(element const& element) const;
+
+    /// returns the offset of proptery into its elements in bytes
+    size_t offset_of(element const& element, property const& property) const;
+
+    /// returns the index of the first byte of the given property data
+    size_t data_start_index(element const& element, property const& property) const;
 };
 
 geometry read(cc::span<const std::byte> data, babel::ply::read_config const& cfg = {}, error_handler on_error = default_error_handler);
