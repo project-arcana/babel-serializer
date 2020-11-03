@@ -10,34 +10,28 @@
 
 #include <babel-serializer/errors.hh>
 
+// http://www.geomview.org/docs/html/OFF.html
 namespace babel::off
 {
 struct read_config
 {
-    bool has_colors = false;
-    bool has_normals = false;
-    bool has_tex_coords = false;
-    int dimension = 3;
 };
 struct geometry
 {
-    struct face_entry
-    {
-        int vertex_index = -1;
-    };
+    // a face consists of a set of
     struct face
     {
-        int entries_start = -1;
-        int entries_count = -1;
+        int vertices_start = -1;
+        int vertices_count = -1;
     };
 
     cc::vector<tg::pos4> vertices;
+    cc::vector<int> face_vertices;
+    cc::vector<face> faces;
     cc::vector<tg::vec3> normals;
     cc::vector<tg::pos2> tex_coords;
-    cc::vector<face_entry> face_entries;
-    cc::vector<face> faces;
-    cc::vector<tg::color4> colors;
-    cc::vector<int> colormap_indices;
+    cc::vector<tg::color4> vertex_colors;
+    cc::vector<tg::color4> face_colors;
 };
 geometry read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
 }
