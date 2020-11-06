@@ -1,9 +1,5 @@
 #include "pcap.hh"
 
-#include <rich-log/log.hh>
-#include <clean-core/format.hh>
-
-
 babel::pcap::data babel::pcap::read(cc::span<const std::byte> data, read_config const& cfg, babel::error_handler on_error)
 {
     babel::pcap::data r;
