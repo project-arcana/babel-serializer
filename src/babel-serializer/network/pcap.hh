@@ -57,6 +57,6 @@ struct data
 /// reads a pcap dump from memory
 data read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
 
-/// reads a pcap dump from memory
+/// reads a pcap dump from memory calling on_header once for the header and then on_packet for each contained packet
 void read(cc::span<std::byte const> data, cc::function_ref<void(data::packet const&, cc::span<std::byte const>)> on_packet, cc::function_ref<void(struct data::header const&)> on_header = [](auto){}, read_config const& cfg = {}, error_handler on_error= default_error_handler);
 }
