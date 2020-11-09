@@ -13,14 +13,18 @@ babel::pcap::data babel::pcap::read(cc::span<const std::byte> data, read_config 
     return r;
 }
 
-void babel::pcap::read(cc::span<std::byte const> data, cc::function_ref<void (data::packet const&, cc::span<std::byte const>)> on_packet,cc::function_ref<void (struct data::header const&)> on_header, babel::pcap::read_config const& cfg, babel::error_handler on_error)
+void babel::pcap::read(cc::span<std::byte const> data,
+                       cc::function_ref<void(data::packet const&, cc::span<std::byte const>)> on_packet,
+                       cc::function_ref<void(struct data::header const&)> on_header,
+                       babel::pcap::read_config const& cfg,
+                       babel::error_handler on_error)
 {
     // TODO: more error handling
     // TODO: Endianness, nanosecond timestamps (using magic number)
 
     struct data::header h;
 
-    if(data.size() < sizeof(h))
+    if (data.size() < sizeof(h))
         on_error(data, data, "not enough data to read header", severity::error);
 
     cc::as_byte_span(data, 0, sizeof(h)).copy_to(cc::as_byte_span(h));
@@ -51,7 +55,7 @@ void babel::pcap::read(cc::span<std::byte const> data, cc::function_ref<void (da
         p.timestamp_usec = header.ts_usec;
         p.stored_size = header.incl_len;
         p.original_size = header.orig_len;
-        p.stored_offset = uint32_t(pos);
+        p.stored_offset = pos;
 
         on_packet(p, data.subspan(p.stored_offset, p.stored_size));
 
@@ -60,5 +64,4 @@ void babel::pcap::read(cc::span<std::byte const> data, cc::function_ref<void (da
 
     if (pos != data.size())
         on_error(data, {}, "last packet defined more data than actually provided", severity::warning);
-
 }
