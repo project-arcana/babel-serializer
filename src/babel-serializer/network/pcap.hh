@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include <clean-core/array.hh>
+#include <clean-core/function_ref.hh>
 #include <clean-core/span.hh>
 #include <clean-core/vector.hh>
 
@@ -21,7 +22,7 @@ struct read_config
 struct data
 {
     // NOTE: this is the global header of a pcap file
-    struct
+    struct header
     {
         uint32_t magic_number;  ///< magic number
         uint16_t version_major; ///< major version number
@@ -38,8 +39,8 @@ struct data
         uint32_t timestamp_usec; ///< timestamp microseconds
         uint32_t original_size;  ///< original length of packet (NOT the stored one)
 
-        uint32_t stored_offset; ///< offset into data::bytes
-        uint32_t stored_size;   ///< actual stored length of the packet (might have been truncated)
+        uint32_t stored_size; ///< actual stored length of the packet (might have been truncated)
+        size_t stored_offset; ///< offset into data::bytes
     };
 
     /// vector of all packets
@@ -55,4 +56,11 @@ struct data
 
 /// reads a pcap dump from memory
 data read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
+
+/// reads a pcap dump from memory calling on_header once for the header and then on_packet for each contained packet
+void read(cc::span<std::byte const> data,
+          cc::function_ref<void(data::packet const&, cc::span<std::byte const>)> on_packet,
+          cc::function_ref<void(struct data::header const&)> on_header = [](auto) {},
+          read_config const& cfg = {},
+          error_handler on_error = default_error_handler);
 }
