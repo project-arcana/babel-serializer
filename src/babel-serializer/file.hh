@@ -19,13 +19,11 @@ void read(cc::stream_ref<std::byte> out, cc::string_view filename, error_handler
 
 /// reads a file and returns the content as a string (null terminated)
 cc::string read_all_text(cc::string_view filename, error_handler on_error = default_error_handler);
-cc::alloc_array<char> read_all_text(char const* filename, cc::allocator* alloc, error_handler on_error = default_error_handler);
 cc::alloc_array<char> read_all_text(cc::string_view filename, cc::allocator* alloc, error_handler on_error = default_error_handler);
 
 /// reads a file and returns the content as an array of bytes
 cc::array<std::byte> read_all_bytes(cc::string_view filename, error_handler on_error = default_error_handler);
-/// reads a file and returns the content as an allocator-backed array of chars (null terminated)
-cc::alloc_array<std::byte> read_all_bytes(char const* filename, cc::allocator* alloc, error_handler on_error = default_error_handler);
+/// reads a file and returns the content as an allocator-backed array of chars
 cc::alloc_array<std::byte> read_all_bytes(cc::string_view filename, cc::allocator* alloc, error_handler on_error = default_error_handler);
 
 /// writes the given binary data to a file
@@ -41,7 +39,6 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 /// NOTE: overwrites existing files
 struct file_output_stream
 {
-    file_output_stream(char const* filename);
     file_output_stream(cc::string_view filename);
 
     ~file_output_stream()
