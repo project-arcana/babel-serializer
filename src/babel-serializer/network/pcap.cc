@@ -65,3 +65,25 @@ void babel::pcap::read(cc::span<std::byte const> data,
     if (pos != data.size())
         on_error(data, {}, "last packet defined more data than actually provided", severity::warning);
 }
+
+babel::pcap::reader::packet babel::pcap::reader::packet_iterator::read_packet()
+{
+    packet_header ph;
+    if (_pos + sizeof(ph) > _data.size())
+    {
+        _on_error(_data, _data.last(0), "Unexpected end of file", severity::warning);
+        return {};
+    }
+    _data.subspan(_pos, sizeof(ph)).copy_to(cc::as_byte_span(ph));
+    if (_pos + sizeof(ph) + ph.incl_len > _data.size())
+    {
+        _on_error(_data, _data.last(0), "Unexpected end of file", severity::warning);
+        return {};
+    }
+    packet p;
+    p.original_size = ph.orig_len;
+    p.timestamp_usec = ph.ts_usec;
+    p.timestamp_sec = ph.ts_sec;
+    p.data = _data.subspan(_pos + sizeof(ph), ph.incl_len);
+    return p;
+}
