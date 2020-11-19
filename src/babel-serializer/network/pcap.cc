@@ -1,21 +1,7 @@
 #include "pcap.hh"
 
-#include <clean-core/utility.hh>
-
-namespace
-{
-template <class T>
-T byteswap(T v)
-{
-    static_assert(std::is_pod_v<T>);
-    std::byte d[sizeof(v)];
-    cc::as_byte_span(v).copy_to(cc::as_byte_span(d));
-    for (size_t i = 0; i < (sizeof(v) / 2); ++i)
-        cc::swap(d[i], d[sizeof(v) - 1 - i]);
-    cc::as_byte_span(v).copy_from(cc::as_byte_span(d));
-    return v;
-}
-}
+#include <clean-core/bit_cast.hh>
+#include <clean-core/bits.hh>
 
 babel::pcap::detail::packet_iterator::packet_iterator(cc::span<const std::byte> data, const babel::pcap::read_config& cfg, babel::error_handler on_error, bool swap_endianness)
   : _data{data}, _cfg{cfg}, _on_error{on_error}, _swap_endianness{swap_endianness}
@@ -48,10 +34,10 @@ babel::pcap::packet babel::pcap::detail::packet_iterator::read_packet()
     }
     if (_swap_endianness)
     {
-        ph.incl_len = byteswap(ph.incl_len);
-        ph.orig_len = byteswap(ph.orig_len);
-        ph.ts_sec = byteswap(ph.ts_sec);
-        ph.ts_usec = byteswap(ph.ts_usec);
+        ph.incl_len = cc::byteswap(ph.incl_len);
+        ph.orig_len = cc::byteswap(ph.orig_len);
+        ph.ts_sec = cc::byteswap(ph.ts_sec);
+        ph.ts_usec = cc::byteswap(ph.ts_usec);
     }
     packet p;
     p.original_size = ph.orig_len;
@@ -74,11 +60,11 @@ babel::pcap::header babel::pcap::header_of(cc::span<const std::byte> data, const
     data.subspan(0, sizeof(h)).copy_to(cc::as_byte_span(h));
     if (h.swapped_endianness())
     {
-        h.version_major = byteswap(h.version_major);
-        h.thiszone = byteswap(h.thiszone);
-        h.sigfigs = byteswap(h.sigfigs);
-        h.snap_length = byteswap(h.snap_length);
-        h.network = byteswap(h.network);
+        h.version_major = cc::byteswap(h.version_major);
+        h.thiszone = cc::bit_cast<cc::int32>(cc::byteswap(cc::bit_cast<cc::uint32>(h.thiszone)));
+        h.sigfigs = cc::byteswap(h.sigfigs);
+        h.snap_length = cc::byteswap(h.snap_length);
+        h.network = cc::byteswap(h.network);
     }
     return h;
 }

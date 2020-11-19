@@ -13,6 +13,7 @@ namespace detail
 struct packet_range; // fwd
 }
 
+/// This is the header for an entire pcap file
 struct header
 {
     uint32_t magic_number;  ///< magic number
@@ -27,10 +28,11 @@ struct header
     /// pcap file has opposite endianness than the system that is now reading the file
     [[nodiscard]] constexpr bool swapped_endianness() const { return magic_number == 0xd4c3b2a1u || magic_number == 0x4d3cb2a1u; }
 
-    /// Returns true, iff the packet timestamps are nanoseconds instead of microseconds
+    /// returns true, if the packet timestamps are nanoseconds instead of microseconds
     [[nodiscard]] constexpr bool nanosecond_timestamps() const { return magic_number == 0xa1b23c4du || magic_number == 0x4d3cb2a1u; }
 };
 
+/// this represents a single packet of a pcap file
 struct packet
 {
     uint32_t timestamp_sec = 0;     ///< timestamp seconds
@@ -89,7 +91,7 @@ struct packet_iterator
 private:
     packet read_packet();
     cc::span<std::byte const> _data;
-    read_config const& _cfg; // currently unused
+    read_config _cfg; // currently unused
     error_handler _on_error;
     bool _swap_endianness;
     packet _current_packet;
@@ -99,7 +101,7 @@ private:
 struct packet_range
 {
     cc::span<std::byte const> data; ///< data without the header
-    read_config const& cfg;
+    read_config cfg;
     error_handler on_error;
     bool swap_endianness;
 
