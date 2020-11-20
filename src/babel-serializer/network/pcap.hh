@@ -26,10 +26,10 @@ struct header
 
     /// returns true, if the endianness of all data must be swapped because the system that produced this
     /// pcap file has opposite endianness than the system that is now reading the file
-    [[nodiscard]] constexpr bool swapped_endianness() const { return magic_number == 0xd4c3b2a1u || magic_number == 0x4d3cb2a1u; }
+    bool has_swapped_endianness() const { return magic_number == 0xd4c3b2a1u || magic_number == 0x4d3cb2a1u; }
 
     /// returns true, if the packet timestamps are nanoseconds instead of microseconds
-    [[nodiscard]] constexpr bool nanosecond_timestamps() const { return magic_number == 0xa1b23c4du || magic_number == 0x4d3cb2a1u; }
+    bool has_nanosecond_timestamps() const { return magic_number == 0xa1b23c4du || magic_number == 0x4d3cb2a1u; }
 };
 
 /// this represents a single packet of a pcap file
