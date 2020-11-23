@@ -3,9 +3,10 @@
 #include <clean-core/bit_cast.hh>
 #include <clean-core/bits.hh>
 
-babel::pcap::detail::packet_iterator::packet_iterator(cc::span<const std::byte> data, const babel::pcap::read_config& cfg, babel::error_handler on_error, bool swap_endianness)
+babel::pcap::detail::packet_iterator::packet_iterator(cc::span<std::byte const> data, babel::pcap::read_config const& cfg, babel::error_handler on_error, bool swap_endianness)
   : _data{data}, _cfg{cfg}, _on_error{on_error}, _swap_endianness{swap_endianness}
 {
+    (void)_cfg; // currently unused
     if (!_data.empty())
         _current_packet = read_packet();
 }
@@ -47,7 +48,7 @@ babel::pcap::packet babel::pcap::detail::packet_iterator::read_packet()
     return p;
 }
 
-babel::pcap::header babel::pcap::header_of(cc::span<const std::byte> data, const babel::pcap::read_config& cfg, babel::error_handler on_error)
+babel::pcap::header babel::pcap::header_of(cc::span<std::byte const> data, babel::pcap::read_config const& cfg, babel::error_handler on_error)
 {
     (void)cfg; // for now unused
 
@@ -69,7 +70,7 @@ babel::pcap::header babel::pcap::header_of(cc::span<const std::byte> data, const
     return h;
 }
 
-babel::pcap::detail::packet_range babel::pcap::packets_of(cc::span<const std::byte> data, const babel::pcap::read_config& cfg, babel::error_handler on_error)
+babel::pcap::detail::packet_range babel::pcap::packets_of(cc::span<std::byte const> data, babel::pcap::read_config const& cfg, babel::error_handler on_error)
 {
     auto const h = header_of(data);
     return detail::packet_range(data.subspan(sizeof(header)), cfg, on_error, h.has_swapped_endianness());
