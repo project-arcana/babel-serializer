@@ -58,7 +58,7 @@ babel::pcap::header babel::pcap::header_of(cc::span<const std::byte> data, const
         return {};
     }
     data.subspan(0, sizeof(h)).copy_to(cc::as_byte_span(h));
-    if (h.swapped_endianness())
+    if (h.has_swapped_endianness())
     {
         h.version_major = cc::byteswap(h.version_major);
         h.thiszone = cc::bit_cast<cc::int32>(cc::byteswap(cc::bit_cast<cc::uint32>(h.thiszone)));
@@ -72,5 +72,5 @@ babel::pcap::header babel::pcap::header_of(cc::span<const std::byte> data, const
 babel::pcap::detail::packet_range babel::pcap::packets_of(cc::span<const std::byte> data, const babel::pcap::read_config& cfg, babel::error_handler on_error)
 {
     auto const h = header_of(data);
-    return detail::packet_range(data.subspan(sizeof(header)), cfg, on_error, h.swapped_endianness());
+    return detail::packet_range(data.subspan(sizeof(header)), cfg, on_error, h.has_swapped_endianness());
 }
