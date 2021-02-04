@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include <clean-core/alloc_array.hh>
+#include <clean-core/array.hh>
 #include <clean-core/range_ref.hh>
 #include <clean-core/stream_ref.hh>
 #include <clean-core/string_view.hh>
