@@ -54,10 +54,10 @@ struct geometry
     struct property
     {
         cc::string name;
-        type type = type::invalid;
-        enum type list_size_type = type::invalid;
+        ply::type type = ply::type::invalid;
+        ply::type list_size_type = ply::type::invalid;
 
-        constexpr bool is_list() const { return list_size_type != type::invalid; }
+        constexpr bool is_list() const { return list_size_type != ply::type::invalid; }
     };
 
     /// To allow the use of cc::strided_span to access a propertys data, lists are stored separately in 'list_data'.

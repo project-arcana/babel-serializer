@@ -20,7 +20,7 @@ babel::off::geometry babel::off::read(cc::span<const std::byte> data, babel::off
     auto has_tex_coords = false;
     auto has_normals = false;
     auto has_vertex_colors = false;
-    auto has_face_colors = false;
+    [[maybe_unused]] auto has_face_colors = false;
     auto is_homogeneous = false;
     auto has_dimension = false;
     auto has_header = false;
