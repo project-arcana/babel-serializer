@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 #include <clean-core/move.hh>
 #include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
-#include <clean-core/typedefs.hh>
 
 namespace babel::experimental
 {
@@ -42,15 +43,15 @@ struct byte_writer
     return_t write_char(char v) { return write_raw(cc::as_byte_span(v)); }
     return_t write_byte(std::byte v) { return write_raw(cc::span<std::byte>(v)); }
 
-    return_t write_i8(cc::int8 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i16(cc::int16 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i32(cc::int32 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i64(cc::int64 v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i8(int8_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i16(int16_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i32(int32_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i64(int64_t v) { return write_raw(cc::as_byte_span(v)); }
 
-    return_t write_u8(cc::uint8 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u16(cc::uint16 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u32(cc::uint32 v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u64(cc::uint64 v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u8(uint8_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u16(uint16_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u32(uint32_t v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u64(uint64_t v) { return write_raw(cc::as_byte_span(v)); }
 
     return_t write_f32(float v) { return write_raw(cc::as_byte_span(v)); }
     return_t write_f64(double v) { return write_raw(cc::as_byte_span(v)); }
@@ -64,15 +65,15 @@ struct byte_writer
     return_t write_char_span(cc::span<char const> v) { return write_raw(cc::as_byte_span(v)); }
     return_t write_byte_span(cc::span<std::byte const> v) { return write_raw(v); }
 
-    return_t write_i8_span(cc::span<cc::int8 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i16_span(cc::span<cc::int16 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i32_span(cc::span<cc::int32 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_i64_span(cc::span<cc::int64 const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i8_span(cc::span<int8_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i16_span(cc::span<int16_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i32_span(cc::span<int32_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_i64_span(cc::span<int64_t const> v) { return write_raw(cc::as_byte_span(v)); }
 
-    return_t write_u8_span(cc::span<cc::uint8 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u16_span(cc::span<cc::uint16 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u32_span(cc::span<cc::uint32 const> v) { return write_raw(cc::as_byte_span(v)); }
-    return_t write_u64_span(cc::span<cc::uint64 const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u8_span(cc::span<uint8_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u16_span(cc::span<uint16_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u32_span(cc::span<uint32_t const> v) { return write_raw(cc::as_byte_span(v)); }
+    return_t write_u64_span(cc::span<uint64_t const> v) { return write_raw(cc::as_byte_span(v)); }
 
     return_t write_f32_span(cc::span<float const> v) { return write_raw(cc::as_byte_span(v)); }
     return_t write_f64_span(cc::span<double const> v) { return write_raw(cc::as_byte_span(v)); }

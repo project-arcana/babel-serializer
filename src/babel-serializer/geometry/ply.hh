@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cstddef>     // std::byte
+#include <cstddef> // std::byte
+#include <cstdint>
 #include <type_traits> // std::is_same_v
 
 #include <clean-core/assert.hh>
@@ -93,14 +94,14 @@ public: // api
     cc::strided_span<T> get_data(element const& element, property const& property)
     {
         CC_ASSERT(property.is_list() == (std::is_same_v<T, list_property_entry>)&&"Lists must be read as 'list_property_entry'");
-        return {reinterpret_cast<T*>(&(data[data_start_index(element, property)])), size_t(element.count), cc::int64(size_in_bytes(element))};
+        return {reinterpret_cast<T*>(&(data[data_start_index(element, property)])), size_t(element.count), int64_t(size_in_bytes(element))};
     }
 
     template <class T>
     cc::strided_span<T const> get_data(element const& element, property const& property) const
     {
         CC_ASSERT(property.is_list() == (std::is_same_v<T, list_property_entry const>)&&"Lists must be read as 'list_property_entry'");
-        return {reinterpret_cast<T const*>(&(data[data_start_index(element, property)])), size_t(element.count), cc::int64(size_in_bytes(element))};
+        return {reinterpret_cast<T const*>(&(data[data_start_index(element, property)])), size_t(element.count), int64_t(size_in_bytes(element))};
     }
 
     cc::strided_span<list_property_entry> get_list_entries(element const& element, property const& property)

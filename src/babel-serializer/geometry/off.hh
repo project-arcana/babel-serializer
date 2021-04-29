@@ -3,7 +3,6 @@
 #include <cstddef> // std::byte
 
 #include <clean-core/span.hh>
-#include <clean-core/typedefs.hh>
 #include <clean-core/vector.hh>
 
 #include <typed-geometry/tg-lean.hh>

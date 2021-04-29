@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
-#include <clean-core/typedefs.hh>
 
 namespace babel::experimental
 {
@@ -71,15 +72,15 @@ public:
     bool read_char(char& v) { return read_raw(cc::as_byte_span(v)); }
     bool read_byte(std::byte& v) { return read_raw(cc::span<std::byte>(v)); }
 
-    bool read_i8(cc::int8& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i16(cc::int16& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i32(cc::int32& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i64(cc::int64& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i8(int8_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i16(int16_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i32(int32_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i64(int64_t& v) { return read_raw(cc::as_byte_span(v)); }
 
-    bool read_u8(cc::uint8& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u16(cc::uint16& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u32(cc::uint32& v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u64(cc::uint64& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u8(uint8_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u16(uint16_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u32(uint32_t& v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u64(uint64_t& v) { return read_raw(cc::as_byte_span(v)); }
 
     bool read_f32(float& v) { return read_raw(cc::as_byte_span(v)); }
     bool read_f64(double& v) { return read_raw(cc::as_byte_span(v)); }
@@ -93,15 +94,15 @@ public:
     bool read_char_span(cc::span<char> v) { return read_raw(cc::as_byte_span(v)); }
     bool read_byte_span(cc::span<std::byte> v) { return read_raw(v); }
 
-    bool read_i8_span(cc::span<cc::int8> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i16_span(cc::span<cc::int16> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i32_span(cc::span<cc::int32> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_i64_span(cc::span<cc::int64> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i8_span(cc::span<int8_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i16_span(cc::span<int16_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i32_span(cc::span<int32_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_i64_span(cc::span<int64_t> v) { return read_raw(cc::as_byte_span(v)); }
 
-    bool read_u8_span(cc::span<cc::uint8> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u16_span(cc::span<cc::uint16> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u32_span(cc::span<cc::uint32> v) { return read_raw(cc::as_byte_span(v)); }
-    bool read_u64_span(cc::span<cc::uint64> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u8_span(cc::span<uint8_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u16_span(cc::span<uint16_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u32_span(cc::span<uint32_t> v) { return read_raw(cc::as_byte_span(v)); }
+    bool read_u64_span(cc::span<uint64_t> v) { return read_raw(cc::as_byte_span(v)); }
 
     bool read_f32_span(cc::span<float> v) { return read_raw(cc::as_byte_span(v)); }
     bool read_f64_span(cc::span<double> v) { return read_raw(cc::as_byte_span(v)); }
@@ -150,15 +151,15 @@ public:
     char read_char() { return read_pod<char>(); }
     std::byte read_byte() { return read_pod<std::byte>(); }
 
-    cc::int8 read_i8() { return read_pod<cc::int8>(); }
-    cc::int16 read_i16() { return read_pod<cc::int16>(); }
-    cc::int32 read_i32() { return read_pod<cc::int32>(); }
-    cc::int64 read_i64() { return read_pod<cc::int64>(); }
+    int8_t read_i8() { return read_pod<int8_t>(); }
+    int16_t read_i16() { return read_pod<int16_t>(); }
+    int32_t read_i32() { return read_pod<int32_t>(); }
+    int64_t read_i64() { return read_pod<int64_t>(); }
 
-    cc::uint8 read_u8() { return read_pod<cc::uint8>(); }
-    cc::uint16 read_u16() { return read_pod<cc::uint16>(); }
-    cc::uint32 read_u32() { return read_pod<cc::uint32>(); }
-    cc::uint64 read_u64() { return read_pod<cc::uint64>(); }
+    uint8_t read_u8() { return read_pod<uint8_t>(); }
+    uint16_t read_u16() { return read_pod<uint16_t>(); }
+    uint32_t read_u32() { return read_pod<uint32_t>(); }
+    uint64_t read_u64() { return read_pod<uint64_t>(); }
 
     float read_f32() { return read_pod<float>(); }
     double read_f64() { return read_pod<double>(); }
@@ -172,15 +173,15 @@ public:
     cc::span<char const> read_char_span(size_t count) { return read_pod_span<char>(count); }
     cc::span<std::byte const> read_byte_span(size_t count) { return read_pod_span<std::byte>(count); }
 
-    cc::span<cc::int8 const> read_i8_span(size_t count) { return read_pod_span<cc::int8>(count); }
-    cc::span<cc::int16 const> read_i16_span(size_t count) { return read_pod_span<cc::int16>(count); }
-    cc::span<cc::int32 const> read_i32_span(size_t count) { return read_pod_span<cc::int32>(count); }
-    cc::span<cc::int64 const> read_i64_span(size_t count) { return read_pod_span<cc::int64>(count); }
+    cc::span<int8_t const> read_i8_span(size_t count) { return read_pod_span<int8_t>(count); }
+    cc::span<int16_t const> read_i16_span(size_t count) { return read_pod_span<int16_t>(count); }
+    cc::span<int32_t const> read_i32_span(size_t count) { return read_pod_span<int32_t>(count); }
+    cc::span<int64_t const> read_i64_span(size_t count) { return read_pod_span<int64_t>(count); }
 
-    cc::span<cc::uint8 const> read_u8_span(size_t count) { return read_pod_span<cc::uint8>(count); }
-    cc::span<cc::uint16 const> read_u16_span(size_t count) { return read_pod_span<cc::uint16>(count); }
-    cc::span<cc::uint32 const> read_u32_span(size_t count) { return read_pod_span<cc::uint32>(count); }
-    cc::span<cc::uint64 const> read_u64_span(size_t count) { return read_pod_span<cc::uint64>(count); }
+    cc::span<uint8_t const> read_u8_span(size_t count) { return read_pod_span<uint8_t>(count); }
+    cc::span<uint16_t const> read_u16_span(size_t count) { return read_pod_span<uint16_t>(count); }
+    cc::span<uint32_t const> read_u32_span(size_t count) { return read_pod_span<uint32_t>(count); }
+    cc::span<uint64_t const> read_u64_span(size_t count) { return read_pod_span<uint64_t>(count); }
 
     cc::span<float const> read_f32_span(size_t count) { return read_pod_span<float>(count); }
     cc::span<double const> read_f64_span(size_t count) { return read_pod_span<double>(count); }

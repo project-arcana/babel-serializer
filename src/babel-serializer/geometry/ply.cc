@@ -1,5 +1,7 @@
 #include "ply.hh"
 
+#include <cstdint>
+
 #include <clean-core/from_string.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/vector.hh>
@@ -286,50 +288,50 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
         if (file_type::ascii == file_type)
         {
             // ascii helper
-            auto const parse_i8 = [&](cc::string_view s) -> cc::int8 {
-                cc::int8 i = 0;
+            auto const parse_i8 = [&](cc::string_view s) -> int8_t {
+                int8_t i = 0;
                 if (!cc::from_string(s, i))
                     on_error(data, cc::as_byte_span(s), "Failed to parse char!", severity::error);
                 return i;
             };
-            auto const parse_u8 = [&](cc::string_view s) -> cc::uint8 {
-                cc::uint8 u = 0;
+            auto const parse_u8 = [&](cc::string_view s) -> uint8_t {
+                uint8_t u = 0;
                 if (!cc::from_string(s, u))
                     on_error(data, cc::as_byte_span(s), "Failed to parse uchar!", severity::error);
                 return u;
             };
-            auto const parse_i16 = [&](cc::string_view s) -> cc::int16 {
-                cc::int16 i = 0;
+            auto const parse_i16 = [&](cc::string_view s) -> int16_t {
+                int16_t i = 0;
                 if (!cc::from_string(s, i))
                     on_error(data, cc::as_byte_span(s), "Failed to parse short!", severity::error);
                 return i;
             };
-            auto const parse_u16 = [&](cc::string_view s) -> cc::uint16 {
-                cc::uint16 u = 0;
+            auto const parse_u16 = [&](cc::string_view s) -> uint16_t {
+                uint16_t u = 0;
                 if (!cc::from_string(s, u))
                     on_error(data, cc::as_byte_span(s), "Failed to parse ushort!", severity::error);
                 return u;
             };
-            auto const parse_i32 = [&](cc::string_view s) -> cc::int32 {
-                cc::int32 i = 0;
+            auto const parse_i32 = [&](cc::string_view s) -> int32_t {
+                int32_t i = 0;
                 if (!cc::from_string(s, i))
                     on_error(data, cc::as_byte_span(s), "Failed to parse int!", severity::error);
                 return i;
             };
-            auto const parse_u32 = [&](cc::string_view s) -> cc::uint32 {
-                cc::uint32 u = 0;
+            auto const parse_u32 = [&](cc::string_view s) -> uint32_t {
+                uint32_t u = 0;
                 if (!cc::from_string(s, u))
                     on_error(data, cc::as_byte_span(s), "Failed to parse uint!", severity::error);
                 return u;
             };
-            auto const parse_f32 = [&](cc::string_view s) -> cc::float32 {
-                cc::float32 f = 0;
+            auto const parse_f32 = [&](cc::string_view s) -> float {
+                float f = 0;
                 if (!cc::from_string(s, f))
                     on_error(data, cc::as_byte_span(s), "Failed to parse float!", severity::error);
                 return f;
             };
-            auto const parse_f64 = [&](cc::string_view s) -> cc::float64 {
-                cc::float64 f = 0;
+            auto const parse_f64 = [&](cc::string_view s) -> double {
+                double f = 0;
                 if (!cc::from_string(s, f))
                     on_error(data, cc::as_byte_span(s), "Failed to parse double!", severity::error);
                 return f;
@@ -566,35 +568,35 @@ babel::ply::geometry babel::ply::read(cc::span<const std::byte> data, const babe
                             switch (p.list_size_type)
                             {
                             case type::char_t:
-                                list_property.size = cc::int8(raw[0]);
+                                list_property.size = int8_t(raw[0]);
                                 break;
                             case type::uchar_t:
-                                list_property.size = cc::uint8(raw[0]);
+                                list_property.size = uint8_t(raw[0]);
                                 break;
                             case type::short_t:
                             {
-                                cc::int16 i;
+                                int16_t i;
                                 copy(raw, cc::as_byte_span(i));
                                 list_property.size = i;
                                 break;
                             }
                             case type::ushort_t:
                             {
-                                cc::uint16 i;
+                                uint16_t i;
                                 copy(raw, cc::as_byte_span(i));
                                 list_property.size = i;
                                 break;
                             }
                             case type::int_t:
                             {
-                                cc::int32 i;
+                                int32_t i;
                                 copy(raw, cc::as_byte_span(i));
                                 list_property.size = i;
                                 break;
                             }
                             case type::uint_t:
                             {
-                                cc::uint32 i;
+                                uint32_t i;
                                 copy(raw, cc::as_byte_span(i));
                                 list_property.size = i;
                                 break;

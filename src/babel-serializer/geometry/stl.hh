@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef> // std::byte
+#include <cstdint>
 
 #include <clean-core/span.hh>
 #include <clean-core/string.hh>
@@ -38,10 +39,10 @@ struct geometry
 
     struct color
     {
-        cc::uint8 r;
-        cc::uint8 g;
-        cc::uint8 b;
-        cc::uint8 a;
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+        uint8_t a;
     };
 
     /// The name is optional and always empty for binary STL files

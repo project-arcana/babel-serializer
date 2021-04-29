@@ -1,10 +1,11 @@
 #include "stl.hh"
 
+#include <cstdint>
+
 #include <cstring> // std::memcpy
 #include <limits>
 
 #include <clean-core/from_string.hh>
-#include <clean-core/typedefs.hh>
 
 babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl::read_config const& cfg, babel::error_handler on_error)
 {
@@ -52,7 +53,7 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             return data.subspan(last_pos, count);
         };
 
-        stl::geometry::color default_color = {cc::uint8(0.6 * 255), cc::uint8(0.6 * 255), cc::uint8(0.6 * 255), cc::uint8(255)};
+        stl::geometry::color default_color = {uint8_t(0.6 * 255), uint8_t(0.6 * 255), uint8_t(0.6 * 255), uint8_t(255)};
 
         auto const header = get_next(80);
         // check if this is Materialise Magics software style
@@ -65,31 +66,31 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             if (s.starts_with("COLOR="))
             {
                 is_materialize = true;
-                default_color.r = cc::uint8(sv[6]);
-                default_color.g = cc::uint8(sv[7]);
-                default_color.b = cc::uint8(sv[8]);
-                default_color.a = cc::uint8(sv[9]);
+                default_color.r = uint8_t(sv[6]);
+                default_color.g = uint8_t(sv[7]);
+                default_color.b = uint8_t(sv[8]);
+                default_color.a = uint8_t(sv[9]);
                 break;
             }
         }
 
         auto const parse_uint32 = [&]() {
-            cc::uint32 ui;
-            auto const s = get_next(sizeof(cc::uint32));
+            uint32_t ui;
+            auto const s = get_next(sizeof(uint32_t));
             std::memcpy(&ui, s.data(), sizeof(ui));
             return ui;
         };
 
         auto const parse_uint16 = [&]() {
-            cc::uint16 ui;
-            auto const s = get_next(sizeof(cc::uint16));
+            uint16_t ui;
+            auto const s = get_next(sizeof(uint16_t));
             std::memcpy(&ui, s.data(), sizeof(ui));
             return ui;
         };
 
         auto const parse_float = [&]() {
-            cc::float32 f;
-            auto const s = get_next(sizeof(cc::float32));
+            float f;
+            auto const s = get_next(sizeof(float));
             std::memcpy(&f, s.data(), sizeof(f));
             return f;
         };
@@ -128,17 +129,17 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                 auto& c = geometry.triangle_color[i];
                 if (is_materialize)
                 {
-                    c.r = cc::uint8((0x0F & (color >> 8)) << 4);
-                    c.g = cc::uint8((0x0F & (color >> 4)) << 4);
-                    c.b = cc::uint8((0x0F & (color >> 0)) << 4);
+                    c.r = uint8_t((0x0F & (color >> 8)) << 4);
+                    c.g = uint8_t((0x0F & (color >> 4)) << 4);
+                    c.b = uint8_t((0x0F & (color >> 0)) << 4);
                 }
                 else
                 {
-                    c.r = cc::uint8((0x0F & (color >> 0)) << 4);
-                    c.g = cc::uint8((0x0F & (color >> 4)) << 4);
-                    c.b = cc::uint8((0x0F & (color >> 8)) << 4);
+                    c.r = uint8_t((0x0F & (color >> 0)) << 4);
+                    c.g = uint8_t((0x0F & (color >> 4)) << 4);
+                    c.b = uint8_t((0x0F & (color >> 8)) << 4);
                 }
-                c.a = cc::uint8(255);
+                c.a = uint8_t(255);
             }
             else
             {
