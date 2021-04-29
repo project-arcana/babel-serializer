@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <clean-core/collection_traits.hh>
 #include <clean-core/fwd.hh>
 #include <clean-core/is_range.hh>
@@ -114,11 +116,11 @@ struct json_ref
             return token[0] == 't';
         }
         cc::string get_string() const; ///< returns the unescaped string content
-        int get_int() const;
+        int32_t get_int() const;
         float get_float() const;
         double get_double() const;
-        cc::int64 get_int64() const;
-        cc::uint64 get_uint64() const;
+        int64_t get_int64() const;
+        uint64_t get_uint64() const;
 
         node() {}
     };
@@ -184,14 +186,12 @@ struct json_writer_base
     void write(cc::string_stream_ref output, cc::nullopt_t const&) { output << "null"; }
     void write(cc::string_stream_ref output, char c) { write_escaped_string(output, cc::string_view(&c, 1)); }
     void write(cc::string_stream_ref output, std::byte v) { cc::to_string(output, int(v)); }
-    void write(cc::string_stream_ref output, signed char v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, unsigned char v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, signed int v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, unsigned int v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, signed long v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, unsigned long v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, signed long long v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, unsigned long long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, int8_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, uint8_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, int32_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, uint32_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, int64_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, uint64_t v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, float v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, double v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, char const* v) { write_escaped_string(output, v); }
@@ -429,16 +429,14 @@ struct json_deserializer
     void deserialize(json_ref::node const& n, bool& v);
     void deserialize(json_ref::node const& n, char& v);
     void deserialize(json_ref::node const& n, std::byte& v);
-    void deserialize(json_ref::node const& n, signed char& v);
-    void deserialize(json_ref::node const& n, unsigned char& v);
-    void deserialize(json_ref::node const& n, signed short& v);
-    void deserialize(json_ref::node const& n, unsigned short& v);
-    void deserialize(json_ref::node const& n, signed int& v);
-    void deserialize(json_ref::node const& n, unsigned int& v);
-    void deserialize(json_ref::node const& n, signed long& v);
-    void deserialize(json_ref::node const& n, unsigned long& v);
-    void deserialize(json_ref::node const& n, signed long long& v);
-    void deserialize(json_ref::node const& n, unsigned long long& v);
+    void deserialize(json_ref::node const& n, int8_t& v);
+    void deserialize(json_ref::node const& n, uint8_t& v);
+    void deserialize(json_ref::node const& n, int16_t& v);
+    void deserialize(json_ref::node const& n, uint16_t& v);
+    void deserialize(json_ref::node const& n, int32_t& v);
+    void deserialize(json_ref::node const& n, uint32_t& v);
+    void deserialize(json_ref::node const& n, int64_t& v);
+    void deserialize(json_ref::node const& n, uint64_t& v);
     void deserialize(json_ref::node const& n, float& v);
     void deserialize(json_ref::node const& n, double& v);
     void deserialize(json_ref::node const& n, cc::string& v);
