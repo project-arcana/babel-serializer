@@ -1,5 +1,7 @@
 #include "pcap.hh"
 
+#include <cstdint>
+
 #include <clean-core/bit_cast.hh>
 #include <clean-core/bits.hh>
 
@@ -62,7 +64,7 @@ babel::pcap::header babel::pcap::header_of(cc::span<std::byte const> data, babel
     if (h.has_swapped_endianness())
     {
         h.version_major = cc::byteswap(h.version_major);
-        h.thiszone = cc::bit_cast<cc::int32>(cc::byteswap(cc::bit_cast<cc::uint32>(h.thiszone)));
+        h.thiszone = cc::bit_cast<int32_t>(cc::byteswap(cc::bit_cast<uint32_t>(h.thiszone)));
         h.sigfigs = cc::byteswap(h.sigfigs);
         h.snap_length = cc::byteswap(h.snap_length);
         h.network = cc::byteswap(h.network);

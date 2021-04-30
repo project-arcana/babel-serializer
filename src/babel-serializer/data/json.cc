@@ -12,11 +12,11 @@ cc::string babel::json::json_ref::node::get_string() const
     return babel::unescape_json_string(token);
 }
 
-int babel::json::json_ref::node::get_int() const
+int32_t babel::json::json_ref::node::get_int() const
 {
     CC_ASSERT(is_number());
 
-    int v;
+    int32_t v;
     auto ok = cc::from_string(token, v);
     CC_ASSERT(ok); // TODO: proper error handling
     return v;
@@ -42,21 +42,21 @@ double babel::json::json_ref::node::get_double() const
     return v;
 }
 
-cc::int64 babel::json::json_ref::node::get_int64() const
+int64_t babel::json::json_ref::node::get_int64() const
 {
     CC_ASSERT(is_number());
 
-    cc::int64 v;
+    int64_t v;
     auto ok = cc::from_string(token, v);
     CC_ASSERT(ok); // TODO: proper error handling
     return v;
 }
 
-cc::uint64 babel::json::json_ref::node::get_uint64() const
+uint64_t babel::json::json_ref::node::get_uint64() const
 {
     CC_ASSERT(is_number());
 
-    cc::uint64 v;
+    uint64_t v;
     auto ok = cc::from_string(token, v);
     CC_ASSERT(ok); // TODO: proper error handling
     return v;
@@ -411,75 +411,61 @@ void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n
     else
         v = std::byte(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed char& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int8_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed char)(n.get_int());
+        v = (int8_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned char& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint8_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned char)(n.get_int());
+        v = (uint8_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed short& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int16_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed short)(n.get_int());
+        v = (int16_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned short& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint16_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned short)(n.get_int());
+        v = (uint16_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed int& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int32_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed int)(n.get_int());
+        v = n.get_int();
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned int& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint32_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned int)(n.get_uint64());
+        v = (uint32_t)(n.get_uint64());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed long& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int64_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed long)(n.get_int64());
+        v = n.get_int64();
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned long& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint64_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned long)(n.get_uint64());
-}
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed long long& v)
-{
-    if (!n.is_number())
-        on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
-    else
-        v = (signed long)(n.get_int64());
-}
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned long long& v)
-{
-    if (!n.is_number())
-        on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
-    else
-        v = (unsigned long)(n.get_uint64());
+        v = n.get_uint64();
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, float& v)
 {
