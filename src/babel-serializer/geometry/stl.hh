@@ -22,6 +22,9 @@ enum class file_type
 struct read_config
 {
     babel::stl::file_type file_type = file_type::autodetect;
+    // Iff true, the reader will emit a warning, if any position or normal values exceed float range but fit into a double.
+    // The result will nevertheless be rounded to float.
+    bool warn_on_double_values = true;
 };
 
 /// See: https://en.wikipedia.org/wiki/STL_(file_format)

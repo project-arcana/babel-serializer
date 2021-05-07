@@ -159,9 +159,17 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
 
         auto const is_space = [](char c) { return cc::is_space(c) || (static_cast<unsigned char>(c) >= static_cast<unsigned char>(128)); }; // treat non-ascii chars as space
 
-        auto const from_string = [](cc::string_view s, float& f) {
+        auto const from_string = [&](cc::string_view s, float& f) {
             if (cc::from_string(s, f))
                 return true;
+            double d_value;
+            if (cc::from_string(s, d_value))
+            {
+                if (cfg.warn_on_double_values)
+                    on_error(data, cc::as_byte_span(s), "stl file contains non-standard double entries", severity::warning);
+                f = float(d_value);
+                return true;
+            }
             if (s.equals_ignore_case("nan"))
             {
                 f = std::numeric_limits<float>::quiet_NaN();
