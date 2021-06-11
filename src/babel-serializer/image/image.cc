@@ -41,17 +41,17 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
     // load
     int w, h;
     int stored_channels;
-    std::byte const* ptr;
+    std::byte* ptr;
     switch (d.bit_depth)
     {
     case bit_depth::u8:
-        ptr = reinterpret_cast<std::byte const*>(babel_stbi_load_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
+        ptr = reinterpret_cast<std::byte*>(babel_stbi_load_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
         break;
     case bit_depth::u16:
-        ptr = reinterpret_cast<std::byte const*>(babel_stbi_load_16_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
+        ptr = reinterpret_cast<std::byte*>(babel_stbi_load_16_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
         break;
     case bit_depth::f32:
-        ptr = reinterpret_cast<std::byte const*>(babel_stbi_loadf_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
+        ptr = reinterpret_cast<std::byte*>(babel_stbi_loadf_from_memory(buffer_data, buffer_size, &w, &h, &stored_channels, int(cfg.desired_channels)));
         break;
     default:
         CC_UNREACHABLE("unsupported bit depth");
@@ -67,6 +67,7 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
         d.depth = 1;
         d.bytes = cc::array<std::byte>::uninitialized(w * h * int(d.channels) * bit_depth_byte_size(d.bit_depth));
         std::memcpy(d.bytes.data(), ptr, d.bytes.size());
+        babel_stbi_image_free(ptr);
     }
     else // error
     {
