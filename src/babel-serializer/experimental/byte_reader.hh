@@ -36,6 +36,9 @@ public:
     /// on success, returns true and writes through the given span
     bool read_raw(cc::span<std::byte> target)
     {
+        if (target.empty())
+            return true;
+
         if (remaining_bytes() < target.size())
             return false;
 
