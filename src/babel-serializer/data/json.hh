@@ -121,8 +121,6 @@ struct json_ref
         double get_double() const;
         int64_t get_int64() const;
         uint64_t get_uint64() const;
-
-        node() {}
     };
 
     /// flat list of all nodes
@@ -186,12 +184,16 @@ struct json_writer_base
     void write(cc::string_stream_ref output, cc::nullopt_t const&) { output << "null"; }
     void write(cc::string_stream_ref output, char c) { write_escaped_string(output, cc::string_view(&c, 1)); }
     void write(cc::string_stream_ref output, std::byte v) { cc::to_string(output, int(v)); }
-    void write(cc::string_stream_ref output, int8_t v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, uint8_t v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, int32_t v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, uint32_t v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, int64_t v) { cc::to_string(output, v); }
-    void write(cc::string_stream_ref output, uint64_t v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed char v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed short v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed int v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, signed long long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned char v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned short v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned int v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned long v) { cc::to_string(output, v); }
+    void write(cc::string_stream_ref output, unsigned long long v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, float v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, double v) { cc::to_string(output, v); }
     void write(cc::string_stream_ref output, char const* v) { write_escaped_string(output, v); }
@@ -270,7 +272,8 @@ struct json_writer_compact : json_writer_base
             output << '{';
             auto first = true;
             rf::do_introspect(
-                [&](auto& v, cc::string_view name) {
+                [&](auto& v, cc::string_view name)
+                {
                     if (first)
                         first = false;
                     else
@@ -377,7 +380,8 @@ struct json_writer_pretty : json_writer_base
             output << "{\n";
             auto first = true;
             rf::do_introspect(
-                [&](auto& v, cc::string_view name) {
+                [&](auto& v, cc::string_view name)
+                {
                     if (first)
                         first = false;
                     else
@@ -429,14 +433,16 @@ struct json_deserializer
     void deserialize(json_ref::node const& n, bool& v);
     void deserialize(json_ref::node const& n, char& v);
     void deserialize(json_ref::node const& n, std::byte& v);
-    void deserialize(json_ref::node const& n, int8_t& v);
-    void deserialize(json_ref::node const& n, uint8_t& v);
-    void deserialize(json_ref::node const& n, int16_t& v);
-    void deserialize(json_ref::node const& n, uint16_t& v);
-    void deserialize(json_ref::node const& n, int32_t& v);
-    void deserialize(json_ref::node const& n, uint32_t& v);
-    void deserialize(json_ref::node const& n, int64_t& v);
-    void deserialize(json_ref::node const& n, uint64_t& v);
+    void deserialize(json_ref::node const& n, signed char& v);
+    void deserialize(json_ref::node const& n, signed short& v);
+    void deserialize(json_ref::node const& n, signed int& v);
+    void deserialize(json_ref::node const& n, signed long& v);
+    void deserialize(json_ref::node const& n, signed long long& v);
+    void deserialize(json_ref::node const& n, unsigned char& v);
+    void deserialize(json_ref::node const& n, unsigned short& v);
+    void deserialize(json_ref::node const& n, unsigned int& v);
+    void deserialize(json_ref::node const& n, unsigned long& v);
+    void deserialize(json_ref::node const& n, unsigned long long& v);
     void deserialize(json_ref::node const& n, float& v);
     void deserialize(json_ref::node const& n, double& v);
     void deserialize(json_ref::node const& n, cc::string& v);
@@ -532,7 +538,8 @@ struct json_deserializer
                 // TODO: benchmark this. if slower, construct a map or something
                 size_t cnt = 0;
                 rf::do_introspect(
-                    [&](auto& member, cc::string_view name) {
+                    [&](auto& member, cc::string_view name)
+                    {
                         auto found = false;
                         auto ci = n.first_child;
                         while (ci > 0)
