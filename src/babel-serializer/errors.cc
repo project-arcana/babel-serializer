@@ -24,14 +24,14 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
     switch (s)
     {
     case severity::warning:
-        LOG_WARN("deserialization error: {}", message);
+        RICH_LOG_WARN("deserialization error: {}", message);
         for (auto l = lls; l <= lle; ++l)
-            LOG_WARN("  {} {} {}", l, ls <= l && l <= le ? '>' : '|', map.lines()[l]);
+            RICH_LOG_WARN("  {} {} {}", l, ls <= l && l <= le ? '>' : '|', map.lines()[l]);
         break;
     case severity::error:
-        LOG_ERROR("deserialization error: {}", message);
+        RICH_LOG_ERROR("deserialization error: {}", message);
         for (auto l = lls; l <= lle; ++l)
-            LOG_ERROR("  {} {} {}", l, ls <= l && l <= le ? '>' : '|', map.lines()[l]);
+            RICH_LOG_ERROR("  {} {} {}", l, ls <= l && l <= le ? '>' : '|', map.lines()[l]);
         CC_UNREACHABLE("deserialization error");
         break;
     }
