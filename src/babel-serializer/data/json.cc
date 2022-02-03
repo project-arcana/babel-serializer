@@ -62,6 +62,52 @@ uint64_t babel::json::json_ref::node::get_uint64() const
     return v;
 }
 
+bool babel::json::json_cursor::has_child(cc::string_view name) const
+{
+    if (!is_object())
+        return false;
+
+    auto ci = first_child;
+    while (ci > 0)
+    {
+        auto const& cname = ref.nodes[ci];
+        CC_ASSERT(cname.next_sibling > 0 && "corrupted deserialization?");
+        CC_ASSERT(cname.is_string() && "corrupted deserialization?");
+
+        if (cname.get_string() == name) // TODO: replace me with an "escape-aware compare"
+            return true;
+
+        ci = cname.next_sibling;
+        auto const& cvalue = ref.nodes[ci];
+        ci = cvalue.next_sibling;
+    }
+
+    return false;
+}
+
+babel::json::json_cursor babel::json::json_cursor::operator[](cc::string_view name) const
+{
+    CC_ASSERT(is_object() && "only works on objects");
+
+    auto ci = first_child;
+    while (ci > 0)
+    {
+        auto const& cname = ref.nodes[ci];
+        CC_ASSERT(cname.next_sibling > 0 && "corrupted deserialization?");
+        CC_ASSERT(cname.is_string() && "corrupted deserialization?");
+
+        ci = cname.next_sibling;
+        auto const& cvalue = ref.nodes[ci];
+
+        if (cname.get_string() == name) // TODO: replace me with an "escape-aware compare"
+            return json_cursor(ref, cvalue);
+
+        ci = cvalue.next_sibling;
+    }
+
+    CC_UNREACHABLE("could not find child");
+}
+
 void babel::json::detail::write_escaped_string(cc::string_stream_ref output, cc::string_view s) { output << babel::escape_json_string(s); }
 
 namespace babel::json
@@ -411,70 +457,56 @@ void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n
     else
         v = std::byte(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed char& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int8_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed char)(n.get_int());
+        v = (int8_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned char& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint8_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned char)(n.get_int());
+        v = (uint8_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed short& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int16_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (signed short)(n.get_int());
+        v = (int16_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned short& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint16_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned short)(n.get_int());
+        v = (uint16_t)(n.get_int());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed int& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int32_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_int();
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned int& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint32_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
-        v = (unsigned int)(n.get_uint64());
+        v = (uint32_t)(n.get_uint64());
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed long& v)
-{
-    if (!n.is_number())
-        on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
-    else
-        v = (signed long)n.get_int64();
-}
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned long& v)
-{
-    if (!n.is_number())
-        on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
-    else
-        v = (unsigned long)n.get_uint64();
-}
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, signed long long& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int64_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_int64();
 }
-void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, unsigned long long& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint64_t& v)
 {
     if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
