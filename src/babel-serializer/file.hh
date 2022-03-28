@@ -4,6 +4,7 @@
 
 #include <clean-core/alloc_array.hh>
 #include <clean-core/array.hh>
+#include <clean-core/macros.hh>
 #include <clean-core/range_ref.hh>
 #include <clean-core/stream_ref.hh>
 #include <clean-core/string_view.hh>
@@ -59,4 +60,20 @@ struct file_output_stream
 private:
     FILE* _file = nullptr;
 };
+
+class memory_mapped_file : public cc::span<std::byte>
+{
+public:
+    memory_mapped_file(cc::string_view filepath);
+    ~memory_mapped_file();
+
+private:
+#if defined(CC_OS_WINDOWS)
+    HANDLE _file_handle = nullptr;
+    HANDLE _file_mapping_handle = nullptr;
+#else
+    int _file_descriptor = -1;
+#endif
+};
+
 }

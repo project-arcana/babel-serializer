@@ -2,7 +2,20 @@
 
 #include <fstream>
 
+#if defined(CC_OS_WINDOWS)
+#include <clean-core/native/win32_sanitized.hh>
+
+#include <WinBase.h>
+#include <fileapi.h>
+#else
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include <clean-core/array.hh>
+#include <clean-core/assertf.hh>
 #include <clean-core/format.hh>
 #include <clean-core/macros.hh>
 #include <clean-core/string.hh>
@@ -164,5 +177,59 @@ babel::file::file_output_stream::file_output_stream(cc::string_view filename)
         _file = nullptr;
 #else
     _file = std::fopen(cc::temp_cstr(filename), "wb");
+#endif
+}
+
+babel::file::memory_mapped_file::memory_mapped_file(cc::string_view filepath)
+{
+#if defined(CC_OS_WINDOWS)
+
+    // todo: error reporting
+    // todo: arbitrarily long paths, see: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
+    _file_handle = CreateFileA(cc::string(filepath).c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    CC_ASSERT(_file_handle != INVALID_HANDLE_VALUE && "failed to open file");
+
+    DWORD high = 0;
+    DWORD low = GetFileSize(_file_handle, &high);
+    size_t size = (size_t(high) << 32) + size_t(low);
+
+    _file_mapping_handle = CreateFileMappingA(_file_handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
+    CC_ASSERT(_file_mapping_handle != INVALID_HANDLE_VALUE && "failed to create file mapping");
+
+    auto const file_view = MapViewOfFile(_file_mapping_handle, FILE_MAP_READ, 0, 0, 0);
+    CC_ASSERT(file_view != INVALID_HANDLE_VALUE && "failed to create file view");
+
+    *static_cast<cc::span<std::byte>*>(this) = cc::span<std::byte>{static_cast<std::byte*>(file_view), size};
+#else
+    _file_descriptor = open(cc::string(filepath).c_str(), O_RDONLY);
+
+    CC_ASSERT(_file_descriptor != -1 && "failed to open file");
+
+    struct stat st;
+    auto const stat_error = fstat(_file_descriptor, &st);
+    CC_ASSERT(stat_error == 0 && "failed to read file size");
+    size_t const size = st.st_size;
+
+    void* const mmap_result = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, _file_descriptor, 0);
+    CC_ASSERTF(mmap_result != MAP_FAILED, "Failed to map file to memory {}", filepath);
+
+    *static_cast<cc::span<std::byte>*>(this) = cc::span<std::byte>{static_cast<std::byte*>(mmap_result), size};
+#endif
+}
+
+babel::file::memory_mapped_file::~memory_mapped_file()
+{
+#if defined(CC_OS_WINDOWS)
+    if (data() && data() != INVALID_HANDLE_VALUE)
+        UnmapViewOfFile(data());
+    if (_file_mapping_handle && _file_mapping_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(_file_mapping_handle);
+    if (_file_handle && _file_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(_file_handle);
+#else
+    if (data())
+        munmap(data(), size());
+    if (_file_descriptor != -1)
+        close(_file_descriptor);
 #endif
 }
