@@ -99,9 +99,42 @@ void impl_unmap(void* data, size_t size, int file_descriptor);
 }
 
 template <class T>
-class memory_mapped_file : public cc::span<T>
+struct memory_mapped_file : public cc::span<T>
 {
 public:
+    memory_mapped_file() = delete;
+    memory_mapped_file(memory_mapped_file const&) = delete;
+    memory_mapped_file& operator=(memory_mapped_file const&) = delete;
+    memory_mapped_file(memory_mapped_file&& rhs)
+    {
+        *static_cast<cc::span<T>*>(this) = rhs;
+        *static_cast<cc::span<T>*>(&rhs) = {};
+#if defined(CC_OS_WINDOWS)
+        _file_handle = rhs._file_handle;
+        rhs._file_handle = nullptr;
+        _file_mapping_handle = rhs._file_mapping_handle;
+        rhs._file_mapping_handle = nullptr;
+#else
+        _file_descriptor = rhs._file_descriptor;
+        rhs._file_descriptor = -1;
+#endif
+    }
+    memory_mapped_file& operator=(memory_mapped_file&& rhs)
+    {
+        *static_cast<cc::span<T>*>(this) = rhs;
+        *static_cast<cc::span<T>*>(&rhs) = {};
+#if defined(CC_OS_WINDOWS)
+        _file_handle = rhs._file_handle;
+        rhs._file_handle = nullptr;
+        _file_mapping_handle = rhs._file_mapping_handle;
+        rhs._file_mapping_handle = nullptr;
+#else
+        _file_descriptor = rhs._file_descriptor;
+        rhs._file_descriptor = -1;
+#endif
+        return *this;
+    }
+
     memory_mapped_file(cc::string_view filepath)
     {
         auto const info = detail::impl_map_file_to_memory(filepath, std::is_const_v<T>);
@@ -125,9 +158,10 @@ public:
 #endif
     }
 
+private:
 #if defined(CC_OS_WINDOWS)
-    HANDLE _file_handle = nullptr;
-    HANDLE _file_mapping_handle = nullptr;
+    void* _file_handle = nullptr;
+    void* _file_mapping_handle = nullptr;
 #else
     int _file_descriptor = -1;
 #endif
