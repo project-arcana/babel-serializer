@@ -42,12 +42,27 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 struct file_output_stream
 {
     file_output_stream(cc::string_view filename);
+    file_output_stream() = delete;
+    file_output_stream(file_output_stream const&) = delete;
+    file_output_stream& operator=(file_output_stream const&) = delete;
+    file_output_stream(file_output_stream&& rhs)
+    {
+        _file = rhs._file;
+        rhs._file = nullptr;
+    }
+    file_output_stream& operator=(file_output_stream&& rhs)
+    {
+        _file = rhs._file;
+        rhs._file = nullptr;
+        return *this;
+    }
 
     ~file_output_stream()
     {
         if (_file)
         {
             std::fclose(_file);
+            _file = nullptr;
         }
     }
 
