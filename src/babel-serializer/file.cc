@@ -180,56 +180,80 @@ babel::file::file_output_stream::file_output_stream(cc::string_view filename)
 #endif
 }
 
-babel::file::memory_mapped_file::memory_mapped_file(cc::string_view filepath)
+babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::string_view filepath, bool is_readonly)
 {
 #if defined(CC_OS_WINDOWS)
 
     // todo: error reporting
     // todo: arbitrarily long paths, see: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
-    _file_handle = CreateFileA(cc::string(filepath).c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    CC_ASSERT(_file_handle != INVALID_HANDLE_VALUE && "failed to open file");
+
+    auto file_handle_access_flags = GENERIC_READ;
+    if (!is_readonly)
+        file_handle_access_flags |= GENERIC_WRITE;
+
+    auto const file_handle = CreateFileA(cc::temp_cstr(filepath), file_handle_access_flags, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    CC_ASSERT(file_handle != INVALID_HANDLE_VALUE && "failed to open file");
 
     DWORD high = 0;
-    DWORD low = GetFileSize(_file_handle, &high);
-    size_t size = (size_t(high) << 32) + size_t(low);
+    DWORD low = GetFileSize(file_handle, &high);
+    size_t byte_size = (size_t(high) << 32) + size_t(low);
 
-    _file_mapping_handle = CreateFileMappingA(_file_handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
-    CC_ASSERT(_file_mapping_handle != INVALID_HANDLE_VALUE && "failed to create file mapping");
+    auto const file_mapping_protection_flags = is_readonly ? PAGE_READONLY : PAGE_READWRITE;
+    auto const file_mapping_handle = CreateFileMappingA(file_handle, nullptr, file_mapping_protection_flags, 0, 0, nullptr);
+    CC_ASSERT(file_mapping_handle != INVALID_HANDLE_VALUE && "failed to create file mapping");
 
-    auto const file_view = MapViewOfFile(_file_mapping_handle, FILE_MAP_READ, 0, 0, 0);
+    auto const file_view_access_flags = is_readonly ? FILE_MAP_READ : FILE_MAP_WRITE; // FILE_MAP_WRITE gives read/write access
+    auto const file_view = MapViewOfFile(file_mapping_handle, file_view_access_flags, 0, 0, 0);
     CC_ASSERT(file_view != INVALID_HANDLE_VALUE && "failed to create file view");
 
-    *static_cast<cc::span<std::byte>*>(this) = cc::span<std::byte>{static_cast<std::byte*>(file_view), size};
+    return {file_handle, file_mapping_handle, byte_size, file_view};
 #else
-    _file_descriptor = open(cc::string(filepath).c_str(), O_RDONLY);
+    // TODO:
+    // The man page for mmap says the following:
+    // After the mmap() call has returned, the file descriptor, fd, can be closed immediately without invalidating the mapping.
+    // Does that mean we can close the file (even in read/write mode) after creating the map and still keep writing to it?
+    // Is this even something we want?
 
-    CC_ASSERT(_file_descriptor != -1 && "failed to open file");
+    auto const file_access_flags = is_readonly ? O_RDONLY : O_RDWR;
+
+    int const file_descriptor = open(cc::temp_cstr(filepath), file_access_flags);
+
+    CC_ASSERT(file_descriptor != -1 && "failed to open file");
 
     struct stat st;
-    auto const stat_error = fstat(_file_descriptor, &st);
+    auto const stat_error = fstat(file_descriptor, &st);
     CC_ASSERT(stat_error == 0 && "failed to read file size");
-    size_t const size = st.st_size;
+    size_t const byte_size = st.st_size;
 
-    void* const mmap_result = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, _file_descriptor, 0);
+    auto mmap_protection_flags = PROT_READ;
+    if (!is_readonly)
+        mmap_protection_flags |= PROT_WRITE;
+
+    auto const mmap_flags = is_readonly ? MAP_PRIVATE : MAP_SHARED;
+
+    void* const mmap_result = mmap(nullptr, byte_size, mmap_protection_flags, mmap_flags, file_descriptor, 0);
     CC_ASSERTF(mmap_result != MAP_FAILED, "Failed to map file to memory {}", filepath);
 
-    *static_cast<cc::span<std::byte>*>(this) = cc::span<std::byte>{static_cast<std::byte*>(mmap_result), size};
+    return {file_descriptor, byte_size, mmap_result};
 #endif
 }
 
-babel::file::memory_mapped_file::~memory_mapped_file()
-{
 #if defined(CC_OS_WINDOWS)
-    if (data() && data() != INVALID_HANDLE_VALUE)
-        UnmapViewOfFile(data());
-    if (_file_mapping_handle && _file_mapping_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(_file_mapping_handle);
-    if (_file_handle && _file_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(_file_handle);
-#else
-    if (data())
-        munmap(data(), size());
-    if (_file_descriptor != -1)
-        close(_file_descriptor);
-#endif
+void babel::file::detail::impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view)
+{
+    if (file_view && file_view != INVALID_HANDLE_VALUE)
+        UnmapViewOfFile(file_view);
+    if (file_mapping_handle && file_mapping_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(file_mapping_handle);
+    if (file_handle && file_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(file_handle);
 }
+#else
+void babel::file::detail::impl_unmap(void* data, size_t size, int file_descriptor)
+{
+    if (data)
+        munmap(data, size);
+    if (file_descriptor != -1)
+        close(file_descriptor);
+}
+#endif

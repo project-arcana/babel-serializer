@@ -61,13 +61,55 @@ private:
     FILE* _file = nullptr;
 };
 
-class memory_mapped_file : public cc::span<std::byte>
+namespace detail
+{
+struct mmap_info
+{
+#if defined(CC_OS_WINDOWS)
+    HANDLE file_handle = nullptr;
+    HANDLE file_mapping_handle = nullptr;
+#else
+    int file_descriptor = -1;
+#endif
+    size_t byte_size = 0;
+    void* data = nullptr;
+};
+mmap_info impl_map_file_to_memory(cc::string_view filepath, bool is_readonly);
+
+#if defined(CC_OS_WINDOWS)
+void impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view);
+#else
+void impl_unmap(void* data, size_t size, int file_descriptor);
+#endif
+}
+
+template <class T>
+class memory_mapped_file : public cc::span<T>
 {
 public:
-    memory_mapped_file(cc::string_view filepath);
-    ~memory_mapped_file();
+    memory_mapped_file(cc::string_view filepath)
+    {
+        auto const info = detail::impl_map_file_to_memory(filepath, std::is_const_v<T>);
+#if defined(CC_OS_WINDOWS)
+        _file_handle = info.file_handle;
+        _file_mapping_handle = info.file_mapping_handle
+#else
+        _file_descriptor = info.file_descriptor;
+#endif
+                                   CC_ASSERT(info.byte_size % sizeof(T) == 0 && "Filesize does not match T");
+        *static_cast<cc::span<T>*>(this) = cc::span<T>{static_cast<T*>(info.data), info.byte_size / sizeof(T)};
+    }
 
-private:
+    ~memory_mapped_file()
+    {
+        // the const cast is ok here because mmap() / MapViewOfFile() returned a void* in the first place
+#if defined(CC_OS_WINDOWS)
+        detail::impl_unmap(_file_handle, _file_mapping_handle, const_cast<void*>(static_cast<void const*>(this->data())));
+#else
+        detail::impl_unmap(const_cast<void*>(static_cast<void const*>(this->data())), this->size(), _file_descriptor);
+#endif
+    }
+
 #if defined(CC_OS_WINDOWS)
     HANDLE _file_handle = nullptr;
     HANDLE _file_mapping_handle = nullptr;
@@ -75,5 +117,4 @@ private:
     int _file_descriptor = -1;
 #endif
 };
-
 }
