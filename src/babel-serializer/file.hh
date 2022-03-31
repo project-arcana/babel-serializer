@@ -5,6 +5,7 @@
 #include <clean-core/alloc_array.hh>
 #include <clean-core/array.hh>
 #include <clean-core/macros.hh>
+#include <clean-core/native/win32_fwd.hh>
 #include <clean-core/range_ref.hh>
 #include <clean-core/stream_ref.hh>
 #include <clean-core/string_view.hh>
@@ -45,12 +46,12 @@ struct file_output_stream
     file_output_stream() = delete;
     file_output_stream(file_output_stream const&) = delete;
     file_output_stream& operator=(file_output_stream const&) = delete;
-    file_output_stream(file_output_stream&& rhs)
+    file_output_stream(file_output_stream&& rhs) noexcept
     {
         _file = rhs._file;
         rhs._file = nullptr;
     }
-    file_output_stream& operator=(file_output_stream&& rhs)
+    file_output_stream& operator=(file_output_stream&& rhs) noexcept
     {
         _file = rhs._file;
         rhs._file = nullptr;
@@ -81,8 +82,8 @@ namespace detail
 struct mmap_info
 {
 #if defined(CC_OS_WINDOWS)
-    void* file_handle = nullptr;
-    void* file_mapping_handle = nullptr;
+    HANDLE file_handle = nullptr;
+    HANDLE file_mapping_handle = nullptr;
 #else
     int file_descriptor = -1;
 #endif
@@ -92,7 +93,7 @@ struct mmap_info
 mmap_info impl_map_file_to_memory(cc::string_view filepath, bool is_readonly);
 
 #if defined(CC_OS_WINDOWS)
-void impl_unmap(void* file_handle, void* file_mapping_handle, void* file_view);
+void impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view);
 #else
 void impl_unmap(void* data, size_t size, int file_descriptor);
 #endif
@@ -105,7 +106,7 @@ public:
     memory_mapped_file() = delete;
     memory_mapped_file(memory_mapped_file const&) = delete;
     memory_mapped_file& operator=(memory_mapped_file const&) = delete;
-    memory_mapped_file(memory_mapped_file&& rhs)
+    memory_mapped_file(memory_mapped_file&& rhs) noexcept
     {
         *static_cast<cc::span<T>*>(this) = rhs;
         *static_cast<cc::span<T>*>(&rhs) = {};
@@ -119,7 +120,7 @@ public:
         rhs._file_descriptor = -1;
 #endif
     }
-    memory_mapped_file& operator=(memory_mapped_file&& rhs)
+    memory_mapped_file& operator=(memory_mapped_file&& rhs) noexcept
     {
         *static_cast<cc::span<T>*>(this) = rhs;
         *static_cast<cc::span<T>*>(&rhs) = {};
@@ -140,11 +141,11 @@ public:
         auto const info = detail::impl_map_file_to_memory(filepath, std::is_const_v<T>);
 #if defined(CC_OS_WINDOWS)
         _file_handle = info.file_handle;
-        _file_mapping_handle = info.file_mapping_handle
+        _file_mapping_handle = info.file_mapping_handle;
 #else
         _file_descriptor = info.file_descriptor;
 #endif
-                                   CC_ASSERT(info.byte_size % sizeof(T) == 0 && "Filesize does not match T");
+        CC_ASSERT(info.byte_size % sizeof(T) == 0 && "Filesize does not match T");
         *static_cast<cc::span<T>*>(this) = cc::span<T>{static_cast<T*>(info.data), info.byte_size / sizeof(T)};
     }
 
@@ -160,8 +161,8 @@ public:
 
 private:
 #if defined(CC_OS_WINDOWS)
-    void* _file_handle = nullptr;
-    void* _file_mapping_handle = nullptr;
+    HANDLE _file_handle = nullptr;
+    HANDLE _file_mapping_handle = nullptr;
 #else
     int _file_descriptor = -1;
 #endif

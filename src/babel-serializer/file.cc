@@ -3,10 +3,16 @@
 #include <fstream>
 
 #if defined(CC_OS_WINDOWS)
+// clang-format off
 #include <clean-core/native/win32_sanitized.hh>
+
+#include <Windows.h>
 
 #include <WinBase.h>
 #include <fileapi.h>
+
+#include <clean-core/native/detail/win32_sanitize_after.inl>
+// clang-format on
 #else
 #include <fcntl.h>
 #include <sys/mman.h>
