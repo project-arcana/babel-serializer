@@ -42,7 +42,7 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 /// NOTE: overwrites existing files
 struct file_output_stream
 {
-    file_output_stream(cc::string_view filename);
+    explicit file_output_stream(cc::string_view filename);
     file_output_stream() = delete;
     file_output_stream(file_output_stream const&) = delete;
     file_output_stream& operator=(file_output_stream const&) = delete;
@@ -136,7 +136,7 @@ public:
         return *this;
     }
 
-    memory_mapped_file(cc::string_view filepath)
+    explicit memory_mapped_file(cc::string_view filepath)
     {
         auto const info = detail::impl_map_file_to_memory(filepath, std::is_const_v<T>);
 #if defined(CC_OS_WINDOWS)
