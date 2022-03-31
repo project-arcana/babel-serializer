@@ -81,8 +81,8 @@ namespace detail
 struct mmap_info
 {
 #if defined(CC_OS_WINDOWS)
-    HANDLE file_handle = nullptr;
-    HANDLE file_mapping_handle = nullptr;
+    void* file_handle = nullptr;
+    void* file_mapping_handle = nullptr;
 #else
     int file_descriptor = -1;
 #endif
@@ -92,7 +92,7 @@ struct mmap_info
 mmap_info impl_map_file_to_memory(cc::string_view filepath, bool is_readonly);
 
 #if defined(CC_OS_WINDOWS)
-void impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view);
+void impl_unmap(void* file_handle, void* file_mapping_handle, void* file_view);
 #else
 void impl_unmap(void* data, size_t size, int file_descriptor);
 #endif
