@@ -85,9 +85,15 @@ public:
 
     // ctor
 public:
-    byte_writer(ByteSpanWriter w) : _write(cc::move(w)) {}
+    byte_writer(ByteSpanWriter&& w) : _write(cc::forward<ByteSpanWriter>(w)) {}
 
 private:
     ByteSpanWriter _write;
 };
+
+template <class T>
+byte_writer(T&&) -> byte_writer<T>;
+template <class T>
+byte_writer(T&) -> byte_writer<T&>;
+
 }
