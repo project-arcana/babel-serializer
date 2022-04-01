@@ -53,6 +53,10 @@ struct file_output_stream
     }
     file_output_stream& operator=(file_output_stream&& rhs) noexcept
     {
+        if (_file)
+        {
+            std::fclose(_file);
+        }
         _file = rhs._file;
         rhs._file = nullptr;
         return *this;
