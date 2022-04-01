@@ -108,6 +108,11 @@ public:
     memory_mapped_file& operator=(memory_mapped_file const&) = delete;
     memory_mapped_file(memory_mapped_file&& rhs) noexcept
     {
+#if defined(CC_OS_WINDOWS)
+        detail::impl_unmap(_file_handle, _file_mapping_handle, const_cast<void*>(static_cast<void const*>(this->data())));
+#else
+        detail::impl_unmap(const_cast<void*>(static_cast<void const*>(this->data())), this->size(), _file_descriptor);
+#endif
         *static_cast<cc::span<T>*>(this) = rhs;
         *static_cast<cc::span<T>*>(&rhs) = {};
 #if defined(CC_OS_WINDOWS)
