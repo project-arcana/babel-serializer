@@ -43,7 +43,7 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 struct file_output_stream
 {
     explicit file_output_stream(cc::string_view filename);
-    file_output_stream() = delete;
+    file_output_stream() = default;
     file_output_stream(file_output_stream const&) = delete;
     file_output_stream& operator=(file_output_stream const&) = delete;
     file_output_stream(file_output_stream&& rhs) noexcept
@@ -103,7 +103,7 @@ template <class T>
 struct memory_mapped_file : public cc::span<T>
 {
 public:
-    memory_mapped_file() = delete;
+    memory_mapped_file() = default;
     memory_mapped_file(memory_mapped_file const&) = delete;
     memory_mapped_file& operator=(memory_mapped_file const&) = delete;
     memory_mapped_file(memory_mapped_file&& rhs) noexcept
