@@ -20,10 +20,14 @@ struct source_map
     /// returns 0-based line index of given char
     int line_of(char const* c) const;
 
+    bool is_binary() const { return _is_binary; }
+
 private:
     cc::string_view _source;
     // string views on all lines in the source
     cc::vector<cc::string_view> _lines;
+
+    bool _is_binary = false;
 
     void parse(cc::string_view source);
 };

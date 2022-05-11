@@ -1,5 +1,7 @@
 #include "source_map.hh"
 
+#include <clean-core/char_predicates.hh>
+#include <clean-core/utility.hh>
 
 babel::source_map::source_map(cc::string_view source) { parse(source); }
 
@@ -33,6 +35,13 @@ void babel::source_map::parse(cc::string_view source)
     char const* line_start = source.begin();
     for (auto const& c : source)
     {
+        if (c < 0x20 && c != '\n' && c != '\t' && c != '\r')
+        {
+            _is_binary = true;
+            _lines.clear();
+            return;
+        }
+
         if (c == '\n')
         {
             auto sv = cc::string_view(line_start, &c);
