@@ -94,7 +94,7 @@ struct json_ref
     {
         // TODO: type in a separate array would save some space
         //      (or merged with next_sibling)
-        node_type type;
+        node_type type = node_type::null;
         size_t next_sibling = 0; ///< if > 0 points to the next node of the same parent
         cc::string_view token;
         size_t first_child = 0; ///< only valid for composite nodes
@@ -121,14 +121,44 @@ struct json_ref
         double get_double() const;
         int64_t get_int64() const;
         uint64_t get_uint64() const;
-
-        node() {}
     };
 
     /// flat list of all nodes
     cc::vector<node> nodes;
 
     node const& root() const { return nodes.front(); }
+};
+
+/// a "cursor" into a json reference
+/// points to a node of a json_ref and can be used to traverse the json document
+/// CAUTION: does NOT use any acceleration, thus finding children is linear in number of children
+/// NOTE: inherits the API of json_ref::node
+struct json_cursor : json_ref::node
+{
+    json_cursor(json_ref const& ref, json_ref::node const& node) : json_ref::node(node), ref(ref) {}
+
+    /// returns true if is_object and a child with the given name exists
+    /// CAUTION: complexity is linear in number of children
+    bool has_child(cc::string_view name) const;
+    /// gets the child with the given name
+    /// requires has_child(name)
+    /// CAUTION: complexity is linear in number of children
+    json_cursor operator[](cc::string_view name) const;
+
+    struct iterator
+    {
+        json_ref const& ref;
+        size_t index = 0;
+
+        json_cursor operator*() const { return json_cursor(ref, ref.nodes[index]); }
+        bool operator!=(cc::sentinel) const { return index > 0; }
+        void operator++() { index = ref.nodes[index].next_sibling; }
+    };
+    iterator begin() const { return {ref, first_child}; }
+    cc::sentinel end() const { return {}; }
+
+private:
+    json_ref const& ref;
 };
 
 /// parses the given json string and returns a json reference,
@@ -270,7 +300,8 @@ struct json_writer_compact : json_writer_base
             output << '{';
             auto first = true;
             rf::do_introspect(
-                [&](auto& v, cc::string_view name) {
+                [&](auto& v, cc::string_view name)
+                {
                     if (first)
                         first = false;
                     else
@@ -377,7 +408,8 @@ struct json_writer_pretty : json_writer_base
             output << "{\n";
             auto first = true;
             rf::do_introspect(
-                [&](auto& v, cc::string_view name) {
+                [&](auto& v, cc::string_view name)
+                {
                     if (first)
                         first = false;
                     else
@@ -532,7 +564,8 @@ struct json_deserializer
                 // TODO: benchmark this. if slower, construct a map or something
                 size_t cnt = 0;
                 rf::do_introspect(
-                    [&](auto& member, cc::string_view name) {
+                    [&](auto& member, cc::string_view name)
+                    {
                         auto found = false;
                         auto ci = n.first_child;
                         while (ci > 0)

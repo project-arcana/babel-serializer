@@ -40,25 +40,31 @@ void write_lines(cc::string_view filename, cc::range_ref<cc::string_view> lines,
 
 /// an output file stream that can be used as cc::stream_ref<char>, cc::stream_ref<std::byte>, cc::string_stream_ref
 /// NOTE: overwrites existing files
+/// NOTE: there is no operator<< because it is really only meant for stream_refs
+///       if you need convenient stream writing into files, wrap this stream with a babel::experimental::byte_writer
 struct file_output_stream
 {
     explicit file_output_stream(cc::string_view filename);
     file_output_stream() = default;
+
+    // no copying
     file_output_stream(file_output_stream const&) = delete;
     file_output_stream& operator=(file_output_stream const&) = delete;
+
+    // moving OK
     file_output_stream(file_output_stream&& rhs) noexcept
     {
         _file = rhs._file;
         rhs._file = nullptr;
     }
-    file_output_stream& operator=(file_output_stream&& rhs) noexcept
+    file_output_stream& operator=(file_output_stream&& rhs)
     {
         if (_file)
-        {
             std::fclose(_file);
-        }
+
         _file = rhs._file;
         rhs._file = nullptr;
+
         return *this;
     }
 
@@ -76,6 +82,7 @@ struct file_output_stream
     void operator()(cc::span<std::byte const> content) { fwrite(content.data(), 1, content.size(), _file); }
 
     bool valid() const { return _file != nullptr; }
+    explicit operator bool() const { return valid(); }
 
 private:
     FILE* _file = nullptr;
