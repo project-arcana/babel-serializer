@@ -141,6 +141,9 @@ void babel::file::write(cc::string_view filename, cc::span<std::byte const> data
     }
 
     file.write(reinterpret_cast<char const*>(data.data()), data.size());
+
+    if (!file.good())
+        on_error({}, {}, cc::format("error writing to file '{}'", filename), severity::warning);
 }
 
 void babel::file::write(cc::string_view filename, cc::string_view data, babel::error_handler on_error)
@@ -158,15 +161,20 @@ void babel::file::write_lines(cc::string_view filename, cc::range_ref<cc::string
     }
 
     auto first = true;
-    lines.for_each([&](cc::string_view line) {
-        if (first)
-            first = false;
-        else if (!line_ending.empty())
-            file.write(line_ending.data(), line_ending.size());
+    lines.for_each(
+        [&](cc::string_view line)
+        {
+            if (first)
+                first = false;
+            else if (!line_ending.empty())
+                file.write(line_ending.data(), line_ending.size());
 
-        if (!line.empty())
-            file.write(line.data(), line.size());
-    });
+            if (!line.empty())
+                file.write(line.data(), line.size());
+        });
+
+    if (!file.good())
+        on_error({}, {}, cc::format("error writing to file '{}'", filename), severity::warning);
 }
 
 bool babel::file::exists(cc::string_view filename)
