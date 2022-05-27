@@ -110,22 +110,35 @@ void impl_unmap(void* data, size_t size, int file_descriptor);
 #endif
 }
 
+/// creates a memory mapped file of a given path
+/// this type is owning and unmaps the file in its dtor
+/// this type is convertible to a span, which is the intended usage
+/// typical usage:
+///
+///   auto mapped_file = babel::file::memory_mapped_file<std::byte>("/path/to/file"); // read & write access
+///   auto data = cc::span(mapped_file);
+///
+///   auto mapped_file = babel::file::memory_mapped_file<std::byte const>("/path/to/file"); // readonly access
+///   auto data = cc::span(mapped_file);
+///
 template <class T>
-struct memory_mapped_file : public cc::span<T>
+struct memory_mapped_file
 {
 public:
+    T* data() { return _data.data(); }
+    T const* data() const { return _data.data(); }
+    size_t size() const { return _data.size(); }
+    size_t size_bytes() const { return _data.size_bytes(); }
+
     memory_mapped_file() = default;
     memory_mapped_file(memory_mapped_file const&) = delete;
     memory_mapped_file& operator=(memory_mapped_file const&) = delete;
+
     memory_mapped_file(memory_mapped_file&& rhs) noexcept
     {
-#if defined(CC_OS_WINDOWS)
-        detail::impl_unmap(_file_handle, _file_mapping_handle, const_cast<void*>(static_cast<void const*>(this->data())));
-#else
-        detail::impl_unmap(const_cast<void*>(static_cast<void const*>(this->data())), this->size(), _file_descriptor);
-#endif
-        *static_cast<cc::span<T>*>(this) = rhs;
-        *static_cast<cc::span<T>*>(&rhs) = {};
+        _data = rhs._data;
+        rhs._data = {};
+
 #if defined(CC_OS_WINDOWS)
         _file_handle = rhs._file_handle;
         rhs._file_handle = nullptr;
@@ -136,10 +149,18 @@ public:
         rhs._file_descriptor = -1;
 #endif
     }
+
     memory_mapped_file& operator=(memory_mapped_file&& rhs) noexcept
     {
-        *static_cast<cc::span<T>*>(this) = rhs;
-        *static_cast<cc::span<T>*>(&rhs) = {};
+#if defined(CC_OS_WINDOWS)
+        detail::impl_unmap(_file_handle, _file_mapping_handle, const_cast<void*>(static_cast<void const*>(this->data())));
+#else
+        detail::impl_unmap(const_cast<void*>(static_cast<void const*>(this->data())), this->size(), _file_descriptor);
+#endif
+
+        _data = rhs._data;
+        rhs._data = {};
+
 #if defined(CC_OS_WINDOWS)
         _file_handle = rhs._file_handle;
         rhs._file_handle = nullptr;
@@ -149,6 +170,7 @@ public:
         _file_descriptor = rhs._file_descriptor;
         rhs._file_descriptor = -1;
 #endif
+
         return *this;
     }
 
@@ -162,7 +184,7 @@ public:
         _file_descriptor = info.file_descriptor;
 #endif
         CC_ASSERT(info.byte_size % sizeof(T) == 0 && "Filesize does not match T");
-        *static_cast<cc::span<T>*>(this) = cc::span<T>{static_cast<T*>(info.data), info.byte_size / sizeof(T)};
+        _data = cc::span<T>{static_cast<T*>(info.data), info.byte_size / sizeof(T)};
     }
 
     ~memory_mapped_file()
@@ -182,5 +204,7 @@ private:
 #else
     int _file_descriptor = -1;
 #endif
+
+    cc::span<T> _data;
 };
 }
