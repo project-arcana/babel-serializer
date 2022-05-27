@@ -219,9 +219,7 @@ babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::
     auto const file_view_access_flags = is_readonly ? FILE_MAP_READ : FILE_MAP_WRITE; // FILE_MAP_WRITE gives read/write access
     auto const file_view = MapViewOfFile(file_mapping_handle, file_view_access_flags, 0, 0, 0);
     CC_ASSERT(file_view != INVALID_HANDLE_VALUE && "failed to create file view");
-
-    LOG_WARN("mapped {}", file_handle);
-
+    
     return {file_handle, file_mapping_handle, byte_size, file_view};
 #else
     // TODO:
@@ -257,8 +255,6 @@ babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::
 #if defined(CC_OS_WINDOWS)
 void babel::file::detail::impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view)
 {
-    LOG_WARN("unmapping {}", file_handle);
-
     if (file_view && file_view != INVALID_HANDLE_VALUE)
     {
         if (!UnmapViewOfFile(file_view))
