@@ -141,6 +141,9 @@ void babel::file::write(cc::string_view filename, cc::span<std::byte const> data
     }
 
     file.write(reinterpret_cast<char const*>(data.data()), data.size());
+
+    if (!file.good())
+        on_error({}, {}, cc::format("error writing to file '{}'", filename), severity::warning);
 }
 
 void babel::file::write(cc::string_view filename, cc::string_view data, babel::error_handler on_error)
@@ -158,15 +161,20 @@ void babel::file::write_lines(cc::string_view filename, cc::range_ref<cc::string
     }
 
     auto first = true;
-    lines.for_each([&](cc::string_view line) {
-        if (first)
-            first = false;
-        else if (!line_ending.empty())
-            file.write(line_ending.data(), line_ending.size());
+    lines.for_each(
+        [&](cc::string_view line)
+        {
+            if (first)
+                first = false;
+            else if (!line_ending.empty())
+                file.write(line_ending.data(), line_ending.size());
 
-        if (!line.empty())
-            file.write(line.data(), line.size());
-    });
+            if (!line.empty())
+                file.write(line.data(), line.size());
+        });
+
+    if (!file.good())
+        on_error({}, {}, cc::format("error writing to file '{}'", filename), severity::warning);
 }
 
 bool babel::file::exists(cc::string_view filename)
@@ -211,7 +219,7 @@ babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::
     auto const file_view_access_flags = is_readonly ? FILE_MAP_READ : FILE_MAP_WRITE; // FILE_MAP_WRITE gives read/write access
     auto const file_view = MapViewOfFile(file_mapping_handle, file_view_access_flags, 0, 0, 0);
     CC_ASSERT(file_view != INVALID_HANDLE_VALUE && "failed to create file view");
-
+    
     return {file_handle, file_mapping_handle, byte_size, file_view};
 #else
     // TODO:
@@ -248,11 +256,20 @@ babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::
 void babel::file::detail::impl_unmap(HANDLE file_handle, HANDLE file_mapping_handle, void* file_view)
 {
     if (file_view && file_view != INVALID_HANDLE_VALUE)
-        UnmapViewOfFile(file_view);
+    {
+        if (!UnmapViewOfFile(file_view))
+            LOG_WARN("unable to close memory mapped file (UnmapViewOfFile)");
+    }
     if (file_mapping_handle && file_mapping_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(file_mapping_handle);
+    {
+        if (!CloseHandle(file_mapping_handle))
+            LOG_WARN("unable to close memory mapped file (CloseHandle of mapping)");
+    }
     if (file_handle && file_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(file_handle);
+    {
+        if (!CloseHandle(file_handle))
+            LOG_WARN("unable to close memory mapped file (CloseHandle of file)");
+    }
 }
 #else
 void babel::file::detail::impl_unmap(void* data, size_t size, int file_descriptor)
