@@ -8,6 +8,7 @@
 
 #include <rich-log/log.hh>
 
+#include <babel-serializer/detail/log.hh>
 #include <babel-serializer/source_map.hh>
 
 void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const std::byte> pos, cc::string_view message, babel::severity s)
@@ -115,9 +116,9 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
             line += "\u001b[0m"; // color reset
         };
 
-        auto print_message = [&](void (*logf)(rlog::MessageBuilder&), bool do_break)
+        cc::string log_message;
         {
-            RICH_LOG_IMPL(logf)("deserialization error: {}", message);
+            cc::format_to(log_message, "deserialization error: {}\n", message);
 
             auto const border_lines = 3;
             auto const last_line = int64_t((data.size() + 15) / 16);
@@ -127,10 +128,10 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
                 if (oos > ipre)
                 {
                     make_line_for(ipre);
-                    RICH_LOG_IMPL(logf)("{}", line);
+                    cc::format_to(log_message, "{}\n", line);
                 }
             if (oos > border_lines * 16)
-                RICH_LOG_IMPL(logf)("  ...");
+                log_message += "  ...\n";
 
             // actual stuff
             auto start_i = oos;
@@ -138,39 +139,39 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
             {
                 if (start_i == skip_o)
                 {
-                    RICH_LOG_IMPL(logf)("  ...");
-                    RICH_LOG_IMPL(logf)("  ... skipping {} bytes", skip_cnt);
-                    RICH_LOG_IMPL(logf)("  ...");
+                    log_message += "  ...\n";
+                    cc::format_to(log_message, "  ... skipping {} bytes\n", skip_cnt);
+                    log_message += "  ...\n";
                     start_i += skip_cnt;
                 }
 
                 make_line_for(start_i);
-                RICH_LOG_IMPL(logf)("{}", line);
+                cc::format_to(log_message, "{}\n", line);
 
                 start_i += 16;
             }
 
             // end of file
             if (ooe < (last_line - border_lines) * 16)
-                RICH_LOG_IMPL(logf)("  ...");
+                log_message += "  ...\n";
             for (auto ipre = (last_line - border_lines) * 16; ipre < int64_t(data.size()); ipre += 16)
                 if (ipre > ooe)
                 {
                     make_line_for(ipre);
-                    RICH_LOG_IMPL(logf)("{}", line);
+                    cc::format_to(log_message, "{}\n", line);
                 }
 
-            if (do_break)
-                CC_UNREACHABLE("deserialization error");
-        };
+            if (!log_message.empty())
+                log_message.pop_back();
+        }
 
         switch (s)
         {
         case severity::warning:
-            print_message(rlog::warning_functor, false);
+            LOGD(Babel, Warning, "%s", log_message);
             break;
         case severity::error:
-            print_message(rlog::warning_functor, true);
+            LOGD(Babel, Error, "%s", log_message);
             break;
         }
     }
@@ -192,9 +193,9 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
         while (line_ellipsis.size() < max_line_s.size())
             line_ellipsis.insert(0, " ");
 
-        auto print_message = [&](void (*logf)(rlog::MessageBuilder&), bool do_break)
+        cc::string log_message;
         {
-            RICH_LOG_IMPL(logf)("deserialization error: {}", message);
+            cc::format_to(log_message, "deserialization error: {}\n", message);
 
             cc::string line;
             auto print_line = [&](int l)
@@ -245,7 +246,7 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
                 }
                 line += "\u001b[0m"; // color reset
 
-                RICH_LOG_IMPL(logf)("{}", line);
+                cc::format_to(log_message, "{}\n", line);
             };
 
             auto const border_lines = 3;
@@ -253,37 +254,34 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
                 if (l < lls)
                     print_line(l);
             if (lls > border_lines)
-                RICH_LOG_IMPL(logf)("  {}", line_ellipsis);
+                cc::format_to(log_message, "  {}", line_ellipsis);
 
             for (auto l = lls; l <= lle; ++l)
             {
                 print_line(l);
                 if (l == skip_l)
                 {
-                    RICH_LOG_IMPL(logf)("  {}", line_ellipsis);
-                    RICH_LOG_IMPL(logf)("  {} skipping {} lines", line_ellipsis, skip_cnt);
-                    RICH_LOG_IMPL(logf)("  {}", line_ellipsis);
+                    cc::format_to(log_message, "  {}\n", line_ellipsis);
+                    cc::format_to(log_message, "  {} skipping {} lines\n", line_ellipsis, skip_cnt);
+                    cc::format_to(log_message, "  {}\n", line_ellipsis);
                     l += skip_cnt;
                 }
             }
 
             if (lle < int(map.lines().size()) - border_lines - 1)
-                RICH_LOG_IMPL(logf)("  {}", line_ellipsis);
+                cc::format_to(log_message, "  {}\n", line_ellipsis);
             for (auto l = int(map.lines().size()) - border_lines; l < int(map.lines().size()); ++l)
                 if (l > lle)
                     print_line(l);
-
-            if (do_break)
-                CC_UNREACHABLE("deserialization error");
         };
 
         switch (s)
         {
         case severity::warning:
-            print_message(rlog::warning_functor, false);
+            LOGD(Babel, Warning, "%s", log_message);
             break;
         case severity::error:
-            print_message(rlog::warning_functor, true);
+            LOGD(Babel, Error, "%s", log_message);
             break;
         }
     }
