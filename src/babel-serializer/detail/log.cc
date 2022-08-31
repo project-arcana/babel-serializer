@@ -1,3 +1,6 @@
 #include "log.hh"
 
-RICH_LOG_DEFINE_DOMAIN(Babel);
+namespace babel
+{
+RICH_LOG_DEFINE_DEFAULT_DOMAIN("babel");
+}

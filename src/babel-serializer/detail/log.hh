@@ -2,4 +2,7 @@
 
 #include <rich-log/domain.hh>
 
-RICH_LOG_DECLARE_DOMAIN(Babel);
+namespace babel
+{
+RICH_LOG_DECLARE_DEFAULT_DOMAIN();
+}

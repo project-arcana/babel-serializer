@@ -168,10 +168,10 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
         switch (s)
         {
         case severity::warning:
-            LOGD(Babel, Warning, "%s", log_message);
+            LOG_WARN("%s", log_message);
             break;
         case severity::error:
-            LOGD(Babel, Error, "%s", log_message);
+            LOG_ERROR("%s", log_message);
             break;
         }
     }
@@ -278,10 +278,10 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
         switch (s)
         {
         case severity::warning:
-            LOGD(Babel, Warning, "%s", log_message);
+            LOG_WARN("%s", log_message);
             break;
         case severity::error:
-            LOGD(Babel, Error, "%s", log_message);
+            LOG_ERROR("%s", log_message);
             break;
         }
     }
