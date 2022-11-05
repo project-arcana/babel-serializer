@@ -5,7 +5,7 @@
 #include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
 
-namespace babel::experimental
+namespace babel
 {
 /// A lightweight, high-performance non-owning binary reader interface
 /// (abstraction over byte span and cursor position)
@@ -310,4 +310,9 @@ private:
     std::byte const* _curr = nullptr;
     std::byte const* _end = nullptr; // NOT included
 };
+}
+
+namespace babel::experimental
+{
+using babel::byte_reader;
 }

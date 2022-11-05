@@ -2,11 +2,12 @@
 
 #include <cstdint>
 
+#include <clean-core/collection_traits.hh>
 #include <clean-core/move.hh>
 #include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
 
-namespace babel::experimental
+namespace babel
 {
 /// A lightweight, high-performance non-owning binary writer interface
 /// (abstraction over a functor that can write cc::span<std::byte const>)
@@ -96,4 +97,9 @@ byte_writer(T&&) -> byte_writer<T>;
 template <class T>
 byte_writer(T&) -> byte_writer<T&>;
 
+}
+
+namespace babel::experimental
+{
+using babel::byte_writer;
 }
