@@ -272,6 +272,9 @@ public:
     /// returns true if at least one byte can be read
     bool has_remaining_bytes() const { return _curr != _end; }
 
+    /// returns true if no bytes can be read anymore
+    bool is_at_end() const { return _curr == _end; }
+
     /// returns a pointer to the current "head"
     /// i.e. the first byte of the remaining data
     /// NOTE: do not dereference the pointer if no bytes are remaining

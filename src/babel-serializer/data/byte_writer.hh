@@ -97,6 +97,24 @@ byte_writer(T&&) -> byte_writer<T>;
 template <class T>
 byte_writer(T&) -> byte_writer<T&>;
 
+/// convenience function to make a byte-writer wrapped around a collection of bytes
+/// CAUTION: collection must outlive the writer!
+template <class Collection>
+[[nodiscard]] auto make_byte_writer(Collection& values)
+{
+    struct wrapper
+    {
+        Collection& values;
+
+        void operator()(cc::span<std::byte const> bytes) const
+        {
+            for (auto b : bytes)
+                cc::collection_add(values, b);
+        }
+    };
+    return byte_writer<wrapper>(wrapper{values});
+}
+
 }
 
 namespace babel::experimental
