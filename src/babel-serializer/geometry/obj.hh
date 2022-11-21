@@ -96,4 +96,24 @@ struct geometry
 
 geometry<float> read(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
 geometry<double> read_double(cc::span<std::byte const> data, read_config const& cfg = {}, error_handler on_error = default_error_handler);
+
+/// creates a flat list of triangles for a given obj
+/// NOTE: asserts that all faces are tris
+template <class T>
+[[nodiscard]] cc::vector<tg::triangle<3, T>> to_triangles(geometry<T> const& obj)
+{
+    cc::vector<tg::triangle<3, T>> res;
+    for (auto f : obj.faces)
+    {
+        CC_ASSERT(f.entries_count == 3);
+        auto i0 = obj.face_entries[f.entries_start + 0].vertex_idx;
+        auto i1 = obj.face_entries[f.entries_start + 1].vertex_idx;
+        auto i2 = obj.face_entries[f.entries_start + 2].vertex_idx;
+        auto v0 = (tg::pos3)obj.vertices[i0];
+        auto v1 = (tg::pos3)obj.vertices[i1];
+        auto v2 = (tg::pos3)obj.vertices[i2];
+        res.emplace_back(v0, v1, v2);
+    }
+    return res;
+}
 }
