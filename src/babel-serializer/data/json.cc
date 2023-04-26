@@ -459,70 +459,90 @@ void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int8_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (int8_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = (int8_t)(n.get_int());
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint8_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (uint8_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = (uint8_t)(n.get_int());
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int16_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (int16_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = (int16_t)(n.get_int());
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint16_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (uint16_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = (uint16_t)(n.get_int());
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int32_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (int32_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_int();
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint32_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (uint32_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = (uint32_t)(n.get_uint64());
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, int64_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (int64_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_int64();
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, uint64_t& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (uint64_t)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_uint64();
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, float& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (float)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_float();
 }
 void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, double& v)
 {
-    if (!n.is_number())
+    if (cfg.allow_bool_number_conversion && n.is_boolean())
+        v = (double)(n.get_boolean());
+    else if (!n.is_number())
         on_error(all_data, cc::as_byte_span(n.token), "expected 'number' node", severity::error);
     else
         v = n.get_double();

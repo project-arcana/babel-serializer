@@ -116,9 +116,11 @@ void impl_unmap(void* data, size_t size, int file_descriptor);
 /// typical usage:
 ///
 ///   auto mapped_file = babel::file::memory_mapped_file<std::byte>("/path/to/file"); // read & write access
+///                  or: babel::file::make_memory_mapped_file_readwrite("/path/to/file");
 ///   auto data = cc::span(mapped_file);
 ///
 ///   auto mapped_file = babel::file::memory_mapped_file<std::byte const>("/path/to/file"); // readonly access
+///                  or: babel::file::make_memory_mapped_file_readonly("/path/to/file");
 ///   auto data = cc::span(mapped_file);
 ///
 template <class T>
@@ -207,4 +209,10 @@ private:
 
     cc::span<T> _data;
 };
+
+/// creates a memory-mapped file with read and write access
+memory_mapped_file<std::byte> make_memory_mapped_file_readwrite(cc::string_view path);
+
+/// creates a memory-mapped file with read access
+memory_mapped_file<std::byte const> make_memory_mapped_file_readonly(cc::string_view path);
 }

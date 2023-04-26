@@ -219,7 +219,7 @@ babel::file::detail::mmap_info babel::file::detail::impl_map_file_to_memory(cc::
     auto const file_view_access_flags = is_readonly ? FILE_MAP_READ : FILE_MAP_WRITE; // FILE_MAP_WRITE gives read/write access
     auto const file_view = MapViewOfFile(file_mapping_handle, file_view_access_flags, 0, 0, 0);
     CC_ASSERT(file_view != INVALID_HANDLE_VALUE && "failed to create file view");
-    
+
     return {file_handle, file_mapping_handle, byte_size, file_view};
 #else
     // TODO:
@@ -258,17 +258,17 @@ void babel::file::detail::impl_unmap(HANDLE file_handle, HANDLE file_mapping_han
     if (file_view && file_view != INVALID_HANDLE_VALUE)
     {
         if (!UnmapViewOfFile(file_view))
-            LOG_WARN("unable to close memory mapped file (UnmapViewOfFile)");
+            RICH_LOG_WARN("unable to close memory mapped file (UnmapViewOfFile)");
     }
     if (file_mapping_handle && file_mapping_handle != INVALID_HANDLE_VALUE)
     {
         if (!CloseHandle(file_mapping_handle))
-            LOG_WARN("unable to close memory mapped file (CloseHandle of mapping)");
+            RICH_LOG_WARN("unable to close memory mapped file (CloseHandle of mapping)");
     }
     if (file_handle && file_handle != INVALID_HANDLE_VALUE)
     {
         if (!CloseHandle(file_handle))
-            LOG_WARN("unable to close memory mapped file (CloseHandle of file)");
+            RICH_LOG_WARN("unable to close memory mapped file (CloseHandle of file)");
     }
 }
 #else
@@ -280,3 +280,13 @@ void babel::file::detail::impl_unmap(void* data, size_t size, int file_descripto
         close(file_descriptor);
 }
 #endif
+
+babel::file::memory_mapped_file<std::byte> babel::file::make_memory_mapped_file_readwrite(cc::string_view path)
+{
+    return memory_mapped_file<std::byte>(path);
+}
+
+babel::file::memory_mapped_file<std::byte const> babel::file::make_memory_mapped_file_readonly(cc::string_view path)
+{
+    return memory_mapped_file<std::byte const>(path);
+}

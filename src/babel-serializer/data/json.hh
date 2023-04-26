@@ -43,6 +43,9 @@ struct read_config
     /// otherwise, missing data is left as-is (relevant for read_to with prefilled object)
     bool init_missing_data = false;
 
+    /// if true, is allowed to convert "true" to 1 and "false" to 0
+    bool allow_bool_number_conversion = false;
+
     // TODO: comments
     // TODO: enums via strings
 };
