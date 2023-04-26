@@ -280,3 +280,13 @@ void babel::file::detail::impl_unmap(void* data, size_t size, int file_descripto
         close(file_descriptor);
 }
 #endif
+
+babel::file::memory_mapped_file<std::byte> babel::file::make_memory_mapped_file_readwrite(cc::string_view path)
+{
+    return memory_mapped_file<std::byte>(path);
+}
+
+babel::file::memory_mapped_file<std::byte const> babel::file::make_memory_mapped_file_readonly(cc::string_view path)
+{
+    return memory_mapped_file<std::byte const>(path);
+}
