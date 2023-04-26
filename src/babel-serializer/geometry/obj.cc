@@ -1,7 +1,9 @@
+#include <cstdio>
 #include <type_traits> // std::is_same_v
 
 #include <clean-core/char_predicates.hh>
 #include <clean-core/from_string.hh>
+#include <clean-core/stream_ref.hh>
 
 #include "obj.hh"
 
@@ -29,7 +31,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
     int group_line_start = 0;
     int group_face_start = 0;
 
-    auto const parse_int = [&](cc::string_view s) -> int {
+    auto const parse_int = [&](cc::string_view s) -> int
+    {
         int i;
         if (cc::from_string(s, i))
         {
@@ -42,7 +45,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         }
     };
 
-    auto const parse_float = [&](cc::string_view s) -> ScalarT {
+    auto const parse_float = [&](cc::string_view s) -> ScalarT
+    {
         ScalarT f;
         if (cc::from_string(s, f))
         {
@@ -55,7 +59,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         }
     };
 
-    auto const parse_vertex = [&](cc::string_view line) {
+    auto const parse_vertex = [&](cc::string_view line)
+    {
         CC_ASSERT(line[0] == 'v');
         CC_ASSERT(cc::is_space(line[1]));
         tg::pos<4, ScalarT> p;
@@ -73,7 +78,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.vertices.push_back(p);
     };
 
-    auto const parse_texture_vertex = [&](cc::string_view line) {
+    auto const parse_texture_vertex = [&](cc::string_view line)
+    {
         CC_ASSERT(line[0] == 'v');
         CC_ASSERT(line[1] == 't');
         CC_ASSERT(cc::is_space(line[2]));
@@ -92,7 +98,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.tex_coords.push_back(p);
     };
 
-    auto const parse_vertex_normal = [&](cc::string_view line) {
+    auto const parse_vertex_normal = [&](cc::string_view line)
+    {
         CC_ASSERT(line[0] == 'v');
         CC_ASSERT(line[1] == 'n');
         CC_ASSERT(cc::is_space(line[2]));
@@ -110,7 +117,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.normals.push_back(p);
     };
 
-    auto const parse_parameter_space_vertex = [&](cc::string_view line) {
+    auto const parse_parameter_space_vertex = [&](cc::string_view line)
+    {
         CC_ASSERT(line[0] == 'v');
         CC_ASSERT(line[1] == 'p');
         CC_ASSERT(cc::is_space(line[2]));
@@ -129,10 +137,12 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.parameters.push_back(p);
     };
 
-    auto const parse_face = [&](cc::string_view line) {
+    auto const parse_face = [&](cc::string_view line)
+    {
         CC_ASSERT(line[0] == 'f');
         CC_ASSERT(cc::is_space(line[1]));
-        auto const parse_entry = [&](cc::string_view s) {
+        auto const parse_entry = [&](cc::string_view s)
+        {
             typename obj::geometry<ScalarT>::face_entry e;
 
             int i = 0;
@@ -210,7 +220,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.faces.push_back({entries_start, entries_count});
     };
 
-    auto const parse_point = [&](cc::string_view s) {
+    auto const parse_point = [&](cc::string_view s)
+    {
         CC_ASSERT(s[0] == 'p');
         CC_ASSERT(cc::is_space(s[1]));
         auto const points = s.subview(2);
@@ -224,7 +235,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         }
     };
 
-    auto const parse_line = [&](cc::string_view s) {
+    auto const parse_line = [&](cc::string_view s)
+    {
         CC_ASSERT(s[0] == 'l');
         CC_ASSERT(cc::is_space(s[1]));
         auto const segments = s.subview(2);
@@ -284,7 +296,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
         geometry.lines.push_back({entries_start, entries_count});
     };
 
-    auto const handle_previous_groups = [&]() {
+    auto const handle_previous_groups = [&]()
+    {
         auto const points_count = int(geometry.points.size()) - group_point_start;
         auto const lines_count = int(geometry.lines.size()) - group_line_start;
         auto const faces_count = int(geometry.faces.size()) - group_face_start;
@@ -313,7 +326,8 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
             }
     };
 
-    auto const parse_groups = [&](cc::string_view s) {
+    auto const parse_groups = [&](cc::string_view s)
+    {
         CC_ASSERT(s[0] == 'g');
         CC_ASSERT(cc::is_space(s[1]));
 
@@ -390,4 +404,36 @@ babel::obj::geometry<float> babel::obj::read(cc::span<const std::byte> data, bab
 babel::obj::geometry<double> babel::obj::read_double(cc::span<const std::byte> data, babel::obj::read_config const& cfg, babel::error_handler on_error)
 {
     return read_impl<double>(data, cfg, on_error);
+}
+
+bool babel::obj::write_simple(cc::stream_ref<std::byte> output, cc::span<tg::pos3 const> vertices, cc::span<tg::ipos3 const> triangles)
+{
+    char buf[256] = {};
+
+#define BABEL_PRINT_LINE(...)                                                                         \
+    do                                                                                                \
+    {                                                                                                 \
+        int const numChars = std::snprintf(buf, sizeof(buf), __VA_ARGS__);                            \
+        output << cc::span<std::byte const>(reinterpret_cast<std::byte*>(&buf[0]), size_t(numChars)); \
+    } while (0)
+
+    BABEL_PRINT_LINE("# Babel simple OBJ Exporter\n\n#\n# object Babel_simpleObj\n#\n\n");
+
+    for (auto const& v : vertices)
+    {
+        BABEL_PRINT_LINE("v  %f %f %f\n", v.x, v.y, v.z);
+    }
+
+    BABEL_PRINT_LINE("# %d vertices\n\no Babel_simpleObj\ng Babel_simpleObj\n", (int)vertices.size());
+
+    for (auto const& t : triangles)
+    {
+        BABEL_PRINT_LINE("f %d %d %d \n", t.x + 1, t.y + 1, t.z + 1);
+    }
+
+    BABEL_PRINT_LINE("# %d polygons - %d triangles\n\n", (int)triangles.size(), (int)triangles.size());
+
+#undef BABEL_PRINT_LINE
+
+    return true;
 }
