@@ -83,6 +83,14 @@ uint8_t modrm_reg_of(std::byte b) { return (uint8_t(b) >> 3) & 0b111; }
 uint8_t modrm_rm_of(std::byte b) { return uint8_t(b) & 0b111; }
 
 //
+// ModR/M
+//
+
+uint8_t sib_scale_of(std::byte b) { return 1 << (uint8_t(b) >> 6); }
+uint8_t sib_index_of(std::byte b, std::byte rex) { return ((uint8_t(b) >> 3) & 0b111) + (is_rex_x(rex) ? 8 : 0); }
+uint8_t sib_base_of(std::byte b, std::byte rex) { return (uint8_t(b) & 0b111) + (is_rex_b(rex) ? 8 : 0); }
+
+//
 // Tables
 //
 
@@ -139,6 +147,11 @@ static constexpr x64_op_info_t x64_op_info = []
         info.mnemonic[0x8B] = mnemonic::mov;
         info.fmt[0x8B] = format_flag::has_modrm;
         info.args[0x8B] = arg_format::modr_modm;
+    }
+    {
+        info.mnemonic[0x8D] = mnemonic::lea;
+        info.fmt[0x8D] = format_flag::has_modrm;
+        info.args[0x8D] = arg_format::modr_modm;
     }
 
     // add/or/...
@@ -247,11 +260,46 @@ void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
         s += '[';
 
     auto regi = modrm_rm_of(modrm);
+    if (has_rex && is_rex_b(in.rex))
+        regi += 8;
+
+    auto skip_plus = false;
 
     // SIB
     if (mode != modrm_mode::register_direct && regi == 0b100)
     {
-        CC_UNREACHABLE("TODO: impl SIB");
+        CC_ASSERT(in.format.offset_sib > 0 && "no sib");
+        auto const sib = in.data[in.format.offset_sib];
+        auto const scale = sib_scale_of(sib);
+        auto const index = sib_index_of(sib, in.rex);
+        auto const base = sib_base_of(sib, in.rex);
+
+        auto const no_base_reg = mode == modrm_mode::register_indirect && (base & 0b111) == 0b101;
+        auto const no_index_reg = mode != modrm_mode::register_indirect && index == 0b0100;
+
+        if (no_index_reg && no_base_reg)
+        {
+            // only disp
+            skip_plus = true;
+        }
+        else if (no_index_reg)
+        {
+            s += x64::to_string(reg64(base));
+        }
+        else if (no_base_reg)
+        {
+            s += x64::to_string(reg64(index));
+            s += " * ";
+            s += cc::to_string(scale);
+        }
+        else
+        {
+            s += x64::to_string(reg64(base));
+            s += " + ";
+            s += x64::to_string(reg64(index));
+            s += " * ";
+            s += cc::to_string(scale);
+        }
     }
     else if (mode == modrm_mode::register_indirect && regi == 0b101)
     {
@@ -260,21 +308,10 @@ void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
     // r/m register
     else
     {
-        // 64bit
-        if (has_rex && is_rex_w(in.rex))
-        {
-            if (is_rex_b(in.rex))
-                regi += 8;
-
+        if (mode != modrm_mode::register_direct || is_rex_w(in.rex))
             s += x64::to_string(reg64(regi));
-        }
-        else // 32bit
-        {
-            if (mode != modrm_mode::register_direct)
-                s += x64::to_string(reg64(regi)); // 64bit address
-            else
-                s += x64::to_string(reg32(regi));
-        }
+        else
+            s += x64::to_string(reg32(regi));
     }
 
     // displacement
@@ -286,7 +323,9 @@ void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
     else if (mode == modrm_mode::memory_disp32_64)
     {
         CC_ASSERT(in.format.offset_displacement > 0 && "instruction has no disp set");
-        s += " + 0x";
+        if (!skip_plus)
+            s += " + ";
+        s += "0x";
         for (auto i = 3; i >= 0; --i)
             s += cc::to_string(in.data[in.format.offset_displacement + i]);
     }
@@ -453,6 +492,8 @@ char const* babel::x64::to_string(mnemonic m)
 
     case mnemonic::mov:
         return "mov";
+    case mnemonic::lea:
+        return "lea";
 
     case mnemonic::call:
         return "call";

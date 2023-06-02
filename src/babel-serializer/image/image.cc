@@ -4,6 +4,7 @@
 #include <clean-core/string.hh>
 
 #include <babel-serializer/detail/stb_image.hh>
+#include <babel-serializer/detail/stb_image_write.hh>
 
 static int bit_depth_byte_size(babel::image::bit_depth d)
 {
@@ -78,9 +79,9 @@ babel::image::data babel::image::read(cc::span<const std::byte> data, read_confi
 }
 
 bool babel::image::write(cc::stream_ref<std::byte> output,
-                         const babel::image::data_header& img,
+                         babel::image::data_header const& img,
                          cc::span<const std::byte> data,
-                         const babel::image::write_config& cfg,
+                         babel::image::write_config const& cfg,
                          babel::error_handler on_error)
 {
     CC_ASSERT(!cfg.format.empty() && "must provide a format");
@@ -91,9 +92,8 @@ bool babel::image::write(cc::stream_ref<std::byte> output,
     auto expected_size = img.width * img.height * img.depth * bit_depth_byte_size(img.bit_depth) * channel_cnt;
     CC_ASSERTF(expected_size == int(data.size()), "image data size is not what is expected (expected {}, got {})", expected_size, data.size());
 
-    auto write_func = +[](void* ctx, void* data, int size) {
-        *reinterpret_cast<cc::stream_ref<std::byte>*>(ctx) << cc::span<std::byte const>(reinterpret_cast<std::byte const*>(data), size);
-    };
+    auto write_func = +[](void* ctx, void* data, int size)
+    { *reinterpret_cast<cc::stream_ref<std::byte>*>(ctx) << cc::span<std::byte const>(reinterpret_cast<std::byte const*>(data), size); };
 
     CC_ASSERT(img.depth == 1 && "3D / layered images not supported");
 

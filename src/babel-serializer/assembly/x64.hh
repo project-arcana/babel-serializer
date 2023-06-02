@@ -112,6 +112,7 @@ enum class mnemonic : uint8_t
     pop,
 
     mov,
+    lea,
 
     call,
     ret,
@@ -126,27 +127,6 @@ enum class mnemonic : uint8_t
     cmp,
 };
 char const* to_string(mnemonic m);
-
-// NOTE: rex versions are always non-rex + 1
-// TODO: maybe make a "rough byte format" and a "detailed format"
-/*enum class instruction_format : uint8_t
-{
-    unknown,
-
-    // 1 byte, op is a 64bit register in the lower opcode
-    // used for e.g. push where there is no 32 bit version
-    b1_opreg_64,
-
-    // 1 byte, op is a register in the lower opcode
-    b1_opreg,
-    // 2 byte, rex prefix, op is a register in the lower opcode
-    b2_rex_opreg,
-
-    // 1 byte, op, modrm byte
-    b2_op_modrm,
-    // 2 byte, rex prefix, op, modrm byte
-    b3_rex_op_modrm,
-};*/
 
 // syntax is roughly that used in https://www.felixcloutier.com/x86/mov
 enum class arg_format : uint8_t
@@ -184,8 +164,6 @@ struct instruction_format
     uint8_t size_displacement : 2 = 0;
 
     arg_format args;
-
-    // TODO: other prefixes?
 };
 static_assert(sizeof(instruction_format) <= 4);
 
