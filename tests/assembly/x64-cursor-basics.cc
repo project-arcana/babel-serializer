@@ -11,14 +11,22 @@
 static int test_add(int a, int b) { return a + b; }
 static int test_min(int a, int b) { return a < b ? a : b; }
 static int test_abs(int a, int b) { return std::abs(a - b); }
+static int test_sum(cc::span<int const> vals)
+{
+    auto s = 0;
+    for (auto i : vals)
+        s += i;
+    return s;
+}
 
 TEST("x64 assembly basic decode")
 {
     cc::set<std::byte const*> seen_starts;
     cc::ringbuffer<std::byte const*> start_queue;
-    start_queue.push_back((std::byte const*)test_abs);
-    start_queue.push_back((std::byte const*)test_min);
-    start_queue.push_back((std::byte const*)test_add);
+    // start_queue.push_back((std::byte const*)test_abs);
+    // start_queue.push_back((std::byte const*)test_add);
+    // start_queue.push_back((std::byte const*)test_min);
+    start_queue.push_back((std::byte const*)test_sum);
 
     // auto fun = +[](int a, int b) { return a + b; };
     // start_queue.push_back((std::byte const*)fun);
@@ -38,7 +46,7 @@ TEST("x64 assembly basic decode")
             if (!i.is_valid())
                 break;
 
-            LOG("%s %<25s %s", i.data, i.as_span(), i);
+            LOG("%s %<33s %s", i.data, i.as_span(), i);
             p_start += i.size;
 
             if (is_return(i)) // ret -> end

@@ -117,6 +117,8 @@ enum class mnemonic : uint8_t
     call,
     ret,
 
+    test,
+
     add,
     or_,
     adc,
@@ -126,14 +128,23 @@ enum class mnemonic : uint8_t
     xor_,
     cmp,
 
+    rol,
+    ror,
+    rcl,
+    rcr,
+    shl,
+    shr,
+    sal,
+    sar,
+
     jmp,
 
     jo,
     jno,
     jb,
     jnb,
-    jz,
-    jnz,
+    je,
+    jne,
     jbe,
     ja,
     js,
@@ -172,6 +183,7 @@ enum class arg_format : uint8_t
 
     opreg,
     opreg64, // always 64bit
+    imm8,
     imm32,
     opreg_imm,
 
