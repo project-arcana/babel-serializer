@@ -94,14 +94,19 @@ uint8_t sib_base_of(std::byte b, std::byte rex) { return (uint8_t(b) & 0b111) + 
 // Tables
 //
 
+enum class subres_entry
+{
+    prim_81,
+    prim_83,
+};
+
 struct x64_op_info_t
 {
+    // if mnemonic is sub_resolve
+    // then args contains offset into _sub table
+    // which then serves +0..7
     x64::mnemonic mnemonic[256] = {};
     arg_format args[256] = {};
-    bool is_always_64bit[256] = {};
-
-    // for stuff like add
-    x64::mnemonic mnemonic_opext[256 * 8] = {};
 
     constexpr void set_op(uint8_t code, x64::mnemonic m, arg_format args)
     {
@@ -109,15 +114,15 @@ struct x64_op_info_t
         this->mnemonic[code] = m;
         this->args[code] = args;
     }
-    constexpr void set_op64(uint8_t code, x64::mnemonic m, arg_format args)
+    constexpr void set_subres(uint8_t code, subres_entry target)
     {
         CC_ASSERT(this->mnemonic[code] == x64::mnemonic::invalid && "already set");
-        this->mnemonic[code] = m;
-        this->args[code] = args;
-        this->is_always_64bit[code] = true;
+        this->mnemonic[code] = x64::mnemonic::_sub_resolve;
+        this->args[code] = arg_format(uint8_t(target) * 8);
     }
 };
 
+// first byte opcode
 static constexpr x64_op_info_t x64_op_info = []
 {
     // TODO: generate me
@@ -127,9 +132,9 @@ static constexpr x64_op_info_t x64_op_info = []
 
     // push / pop
     for (auto r = 0; r < 8; ++r)
-        info.set_op64(0x50 + r, mnemonic::push, arg_format::opreg);
+        info.set_op(0x50 + r, mnemonic::push, arg_format::opreg64);
     for (auto r = 0; r < 8; ++r)
-        info.set_op64(0x58 + r, mnemonic::pop, arg_format::opreg);
+        info.set_op(0x58 + r, mnemonic::pop, arg_format::opreg64);
 
     // move
     info.set_op(0x89, mnemonic::mov, arg_format::modm_modr);
@@ -138,22 +143,23 @@ static constexpr x64_op_info_t x64_op_info = []
 
     // add/or/...
     {
-        info.set_op(0x83, mnemonic::extended_resolve, arg_format::modm_imm8);
-        info.mnemonic_opext[0x83 * 8 + 0] = mnemonic::add;
-        info.mnemonic_opext[0x83 * 8 + 1] = mnemonic::or_;
-        info.mnemonic_opext[0x83 * 8 + 2] = mnemonic::adc;
-        info.mnemonic_opext[0x83 * 8 + 3] = mnemonic::sbb;
-        info.mnemonic_opext[0x83 * 8 + 4] = mnemonic::and_;
-        info.mnemonic_opext[0x83 * 8 + 5] = mnemonic::sub;
-        info.mnemonic_opext[0x83 * 8 + 6] = mnemonic::xor_;
-        info.mnemonic_opext[0x83 * 8 + 7] = mnemonic::cmp;
-    }
+        // extended
+        info.set_subres(0x81, subres_entry::prim_81);
+        info.set_subres(0x83, subres_entry::prim_83);
 
-    // add
-    info.set_op(0x03, mnemonic::add, arg_format::modr_modm);
+        // non-extended
+        info.set_op(0x03, mnemonic::add, arg_format::modr_modm);
+        info.set_op(0x29, mnemonic::sub, arg_format::modm_modr);
+        info.set_op(0x2B, mnemonic::sub, arg_format::modr_modm);
+        info.set_op(0x39, mnemonic::cmp, arg_format::modm_modr);
+        info.set_op(0x3B, mnemonic::cmp, arg_format::modr_modm);
+    }
 
     // call
     info.set_op(0xE8, mnemonic::call, arg_format::imm32);
+
+    // jmp
+    info.set_op(0xE9, mnemonic::jmp, arg_format::imm32);
 
     // ret
     info.set_op(0xC3, mnemonic::ret, arg_format::none);
@@ -161,13 +167,77 @@ static constexpr x64_op_info_t x64_op_info = []
     return info;
 }();
 
+// 0F + opcode
+static constexpr x64_op_info_t x64_op_info_0F = []
+{
+    // TODO: generate me
+    x64_op_info_t info;
+
+    // cmovs
+    info.set_op(0x40, mnemonic::cmovo, arg_format::modr_modm);
+    info.set_op(0x41, mnemonic::cmovno, arg_format::modr_modm);
+    info.set_op(0x42, mnemonic::cmovb, arg_format::modr_modm);
+    info.set_op(0x43, mnemonic::cmovnb, arg_format::modr_modm);
+    info.set_op(0x44, mnemonic::cmovz, arg_format::modr_modm);
+    info.set_op(0x45, mnemonic::cmovnz, arg_format::modr_modm);
+    info.set_op(0x46, mnemonic::cmovbe, arg_format::modr_modm);
+    info.set_op(0x47, mnemonic::cmova, arg_format::modr_modm);
+    info.set_op(0x48, mnemonic::cmovs, arg_format::modr_modm);
+    info.set_op(0x49, mnemonic::cmovns, arg_format::modr_modm);
+    info.set_op(0x4A, mnemonic::cmovp, arg_format::modr_modm);
+    info.set_op(0x4B, mnemonic::cmovnp, arg_format::modr_modm);
+    info.set_op(0x4C, mnemonic::cmovl, arg_format::modr_modm);
+    info.set_op(0x4D, mnemonic::cmovge, arg_format::modr_modm);
+    info.set_op(0x4E, mnemonic::cmovle, arg_format::modr_modm);
+    info.set_op(0x4F, mnemonic::cmovg, arg_format::modr_modm);
+
+    // jumps
+    info.set_op(0x80, mnemonic::jo, arg_format::imm32);
+    info.set_op(0x81, mnemonic::jno, arg_format::imm32);
+    info.set_op(0x82, mnemonic::jb, arg_format::imm32);
+    info.set_op(0x83, mnemonic::jnb, arg_format::imm32);
+    info.set_op(0x84, mnemonic::jz, arg_format::imm32);
+    info.set_op(0x85, mnemonic::jnz, arg_format::imm32);
+    info.set_op(0x86, mnemonic::jbe, arg_format::imm32);
+    info.set_op(0x87, mnemonic::ja, arg_format::imm32);
+    info.set_op(0x88, mnemonic::js, arg_format::imm32);
+    info.set_op(0x89, mnemonic::jns, arg_format::imm32);
+    info.set_op(0x8A, mnemonic::jp, arg_format::imm32);
+    info.set_op(0x8B, mnemonic::jnp, arg_format::imm32);
+    info.set_op(0x8C, mnemonic::jl, arg_format::imm32);
+    info.set_op(0x8D, mnemonic::jge, arg_format::imm32);
+    info.set_op(0x8E, mnemonic::jle, arg_format::imm32);
+    info.set_op(0x8F, mnemonic::jg, arg_format::imm32);
+
+    return info;
+}();
+
+// subop
+static constexpr x64_op_info_t x64_op_info_sub = []
+{
+    // TODO: generate me
+    x64_op_info_t info;
+
+    // add / and / or / ...
+    for (auto code : {subres_entry::prim_81, subres_entry::prim_83})
+    {
+        auto const args = code == subres_entry::prim_81 ? arg_format::modm_imm32 : arg_format::modm_imm8;
+        info.set_op(uint8_t(code) * 8 + 0, mnemonic::add, args);
+        info.set_op(uint8_t(code) * 8 + 1, mnemonic::or_, args);
+        info.set_op(uint8_t(code) * 8 + 2, mnemonic::adc, args);
+        info.set_op(uint8_t(code) * 8 + 3, mnemonic::sbb, args);
+        info.set_op(uint8_t(code) * 8 + 4, mnemonic::and_, args);
+        info.set_op(uint8_t(code) * 8 + 5, mnemonic::sub, args);
+        info.set_op(uint8_t(code) * 8 + 6, mnemonic::xor_, args);
+        info.set_op(uint8_t(code) * 8 + 7, mnemonic::cmp, args);
+    }
+
+    return info;
+}();
+
 void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
 {
-    auto has_rex = in.rex != std::byte(0);
-
-    if (x64_op_info.is_always_64bit[int(in.opcode)])
-        s += x64::to_string(reg64_from_op(in.opcode, false));
-    else if (has_rex && is_rex_w(in.rex))
+    if (is_rex_w(in.rex))
     {
         LOG_WARN("TODO: which rex byte is used here?");
         CC_UNREACHABLE("TODO");
@@ -177,11 +247,21 @@ void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
         s += x64::to_string(reg32_from_op(in.opcode));
 }
 
+void add_opreg64_to_string(cc::string& s, babel::x64::instruction const& in)
+{
+    if (is_rex_w(in.rex))
+    {
+        LOG_WARN("TODO: which rex byte is used here?");
+        CC_UNREACHABLE("TODO");
+        // s += x64::to_string(reg64_from_op(opcode, is_rex_b(rex)));
+    }
+    else
+        s += x64::to_string(reg64_from_op(in.opcode, false));
+}
+
 void add_modr_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     auto has_rex = in.rex != std::byte(0);
-
-    CC_ASSERT(!x64_op_info.is_always_64bit[int(in.opcode)] && "TODO");
 
     auto const modrm = in.data[in.format.offset_modrm];
     // auto const mode = modrm_mode_of(modrm);
@@ -221,8 +301,6 @@ void add_disp8_to_string(cc::string& s, std::byte d)
 void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     auto has_rex = in.rex != std::byte(0);
-
-    CC_ASSERT(!x64_op_info.is_always_64bit[int(in.opcode)] && "TODO");
 
     auto const modrm = in.data[in.format.offset_modrm];
     auto const mode = modrm_mode_of(modrm);
@@ -343,10 +421,23 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
         instr.format.offset_op++;
     }
 
+    // is 0x0F opcode?
+    if (instr.opcode == std::byte(0x0F))
+    {
+        instr.opcode = *data++;
+        instr.format.offset_op++;
+        instr.format.op_group = 1;
+        instr.mnemonic = x64_op_info_0F.mnemonic[int(instr.opcode)];
+        instr.format.args = x64_op_info_0F.args[int(instr.opcode)];
+    }
+    else // only primary opcode
+    {
+        // TODO: single load?
+        instr.mnemonic = x64_op_info.mnemonic[int(instr.opcode)];
+        instr.format.args = x64_op_info.args[int(instr.opcode)];
+    }
+
     // look up primary op
-    // TODO: single load?
-    instr.mnemonic = x64_op_info.mnemonic[int(instr.opcode)];
-    instr.format.args = x64_op_info.args[int(instr.opcode)];
     if (instr.mnemonic == mnemonic::invalid)
     {
         LOG_WARN("unknown instruction for byte 0x%s (in %s)", instr.opcode, cc::span<std::byte const>(instr.data, cc::min(instr.data + 16, end)));
@@ -354,7 +445,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     }
 
     // ModR/M
-    if (has_modrm(instr.format.args))
+    if (instr.mnemonic == mnemonic::_sub_resolve || has_modrm(instr.format.args))
     {
         if (data >= end)
             return {};
@@ -364,8 +455,12 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
         auto mod = modrm_mode_of(modrm);
 
         // extended mnemonic
-        if (instr.mnemonic == mnemonic::extended_resolve)
-            instr.mnemonic = x64_op_info.mnemonic_opext[int(instr.opcode) * 8 + modrm_reg_of(modrm)];
+        if (instr.mnemonic == mnemonic::_sub_resolve)
+        {
+            auto subcode = int(instr.format.args) + modrm_reg_of(modrm);
+            instr.mnemonic = x64_op_info_sub.mnemonic[subcode];
+            instr.format.args = x64_op_info_sub.args[subcode];
+        }
         if (instr.mnemonic == mnemonic::invalid)
         {
             LOG_WARN("unknown instruction for byte 0x%s (in %s)", instr.opcode, cc::span<std::byte const>(instr.data, cc::min(instr.data + 16, end)));
@@ -417,6 +512,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
         CC_UNREACHABLE("TODO");
         break;
 
+    case arg_format::modm_imm32:
     case arg_format::imm32:
         if (data + 3 >= end)
             return {};
@@ -437,6 +533,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     case arg_format::modm_modr:
     case arg_format::modr_modm:
     case arg_format::opreg:
+    case arg_format::opreg64:
     case arg_format::none:
         // no immediate
         break;
@@ -452,8 +549,8 @@ char const* babel::x64::to_string(mnemonic m)
     {
     case mnemonic::invalid:
         return "<invalid-op>";
-    case mnemonic::extended_resolve:
-        return "<unresolved-extended-mnemonic>";
+    case mnemonic::_sub_resolve:
+        return "<unresolved-extended-mnemonic-prim>";
 
     case mnemonic::push:
         return "push";
@@ -486,6 +583,75 @@ char const* babel::x64::to_string(mnemonic m)
         return "xor";
     case mnemonic::cmp:
         return "cmp";
+
+    case mnemonic::jmp:
+        return "jmp";
+
+    case mnemonic::jo:
+        return "jo";
+    case mnemonic::jno:
+        return "jno";
+    case mnemonic::jb:
+        return "jb";
+    case mnemonic::jnb:
+        return "jnb";
+    case mnemonic::jz:
+        return "jz";
+    case mnemonic::jnz:
+        return "jnz";
+    case mnemonic::jbe:
+        return "jbe";
+    case mnemonic::ja:
+        return "ja";
+    case mnemonic::js:
+        return "js";
+    case mnemonic::jns:
+        return "jns";
+    case mnemonic::jp:
+        return "jp";
+    case mnemonic::jnp:
+        return "jnp";
+    case mnemonic::jl:
+        return "jl";
+    case mnemonic::jge:
+        return "jge";
+    case mnemonic::jle:
+        return "jle";
+    case mnemonic::jg:
+        return "jg";
+
+    case mnemonic::cmovo:
+        return "cmovo";
+    case mnemonic::cmovno:
+        return "cmovno";
+    case mnemonic::cmovb:
+        return "cmovb";
+    case mnemonic::cmovnb:
+        return "cmovnb";
+    case mnemonic::cmovz:
+        return "cmovz";
+    case mnemonic::cmovnz:
+        return "cmovnz";
+    case mnemonic::cmovbe:
+        return "cmovbe";
+    case mnemonic::cmova:
+        return "cmova";
+    case mnemonic::cmovs:
+        return "cmovs";
+    case mnemonic::cmovns:
+        return "cmovns";
+    case mnemonic::cmovp:
+        return "cmovp";
+    case mnemonic::cmovnp:
+        return "cmovnp";
+    case mnemonic::cmovl:
+        return "cmovl";
+    case mnemonic::cmovge:
+        return "cmovge";
+    case mnemonic::cmovle:
+        return "cmovle";
+    case mnemonic::cmovg:
+        return "cmovg";
     }
     return "<unknown-op>";
 }
@@ -508,6 +674,10 @@ cc::string babel::x64::instruction::to_string() const
     case arg_format::opreg:
         s += ' '; // TODO: pad?
         add_opreg_to_string(s, *this);
+        break;
+    case arg_format::opreg64:
+        s += ' '; // TODO: pad?
+        add_opreg64_to_string(s, *this);
         break;
     case arg_format::imm32:
         s += ' '; // TODO: pad?

@@ -106,7 +106,7 @@ constexpr char const* to_string(reg32 r)
 enum class mnemonic : uint8_t
 {
     invalid,
-    extended_resolve,
+    _sub_resolve,
 
     push,
     pop,
@@ -125,6 +125,42 @@ enum class mnemonic : uint8_t
     sub,
     xor_,
     cmp,
+
+    jmp,
+
+    jo,
+    jno,
+    jb,
+    jnb,
+    jz,
+    jnz,
+    jbe,
+    ja,
+    js,
+    jns,
+    jp,
+    jnp,
+    jl,
+    jge,
+    jle,
+    jg,
+
+    cmovo,
+    cmovno,
+    cmovb,
+    cmovnb,
+    cmovz,
+    cmovnz,
+    cmovbe,
+    cmova,
+    cmovs,
+    cmovns,
+    cmovp,
+    cmovnp,
+    cmovl,
+    cmovge,
+    cmovle,
+    cmovg,
 };
 char const* to_string(mnemonic m);
 
@@ -135,6 +171,7 @@ enum class arg_format : uint8_t
     none,
 
     opreg,
+    opreg64, // always 64bit
     imm32,
     opreg_imm,
 
@@ -143,6 +180,7 @@ enum class arg_format : uint8_t
     modm_modr,
     modr_modm,
     modm_imm8,
+    modm_imm32,
 };
 static constexpr bool has_modrm(arg_format f) { return uint8_t(f) >= 0b1000'0000; }
 
@@ -152,8 +190,12 @@ static constexpr bool has_modrm(arg_format f) { return uint8_t(f) >= 0b1000'0000
 /// - size of imm/disp is 1/2/4/8
 struct instruction_format
 {
-    uint8_t offset_op : 4 = 0;
-    uint8_t offset_modrm : 4 = 0;
+    uint8_t offset_op : 3 = 0;
+    uint8_t offset_modrm : 3 = 0;
+    // 0 = primary
+    // 1 = secondary
+    // 2 = primary -> subop
+    uint8_t op_group : 2 = 0;
 
     uint8_t offset_sib : 4 = 0;
     uint8_t offset_displacement : 4 = 0;
@@ -224,11 +266,27 @@ inline int32_t int32_immediate_of(instruction const& i)
     return *(int32_t const*)(i.data + i.format.offset_immediate);
 }
 
-inline bool is_relative_call(instruction const& i) { return i.opcode == std::byte(0xE8); }
+inline bool is_conditional_jump(instruction const& i) { return i.format.op_group == 1 && uint8_t(i.opcode) >= 0x80 && uint8_t(i.opcode) <= 0x8F; }
+inline std::byte const* conditional_jump_target(instruction const& i)
+{
+    CC_ASSERT(is_conditional_jump(i));
+    return i.data + i.size + int32_immediate_of(i);
+}
+
+inline bool is_unconditional_jump(instruction const& i) { return i.mnemonic == mnemonic::jmp; }
+inline std::byte const* unconditional_jump_target(instruction const& i)
+{
+    CC_ASSERT(is_unconditional_jump(i));
+    return i.data + i.size + int32_immediate_of(i);
+}
+
+inline bool is_relative_call(instruction const& i) { return i.format.op_group == 0 && i.opcode == std::byte(0xE8); }
 inline std::byte const* relative_call_target(instruction const& i)
 {
     CC_ASSERT(is_relative_call(i));
     return i.data + i.size + int32_immediate_of(i);
 }
+
+inline bool is_return(instruction const& i) { return i.mnemonic == mnemonic::ret; }
 
 } // namespace babel::x64
