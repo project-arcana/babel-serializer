@@ -94,26 +94,28 @@ uint8_t sib_base_of(std::byte b, std::byte rex) { return (uint8_t(b) & 0b111) + 
 // Tables
 //
 
-enum class format_flag : uint8_t
-{
-    // single opcode
-    none = 0,
-
-    // needs to look up modrm
-    // TODO: this could be part of "arg"
-    has_modrm = 1 << 0,
-};
-using format_flags = cc::flags<format_flag, 8>;
-
 struct x64_op_info_t
 {
     x64::mnemonic mnemonic[256] = {};
-    format_flags fmt[256] = {};
     arg_format args[256] = {};
     bool is_always_64bit[256] = {};
 
     // for stuff like add
     x64::mnemonic mnemonic_opext[256 * 8] = {};
+
+    constexpr void set_op(uint8_t code, x64::mnemonic m, arg_format args)
+    {
+        CC_ASSERT(this->mnemonic[code] == x64::mnemonic::invalid && "already set");
+        this->mnemonic[code] = m;
+        this->args[code] = args;
+    }
+    constexpr void set_op64(uint8_t code, x64::mnemonic m, arg_format args)
+    {
+        CC_ASSERT(this->mnemonic[code] == x64::mnemonic::invalid && "already set");
+        this->mnemonic[code] = m;
+        this->args[code] = args;
+        this->is_always_64bit[code] = true;
+    }
 };
 
 static constexpr x64_op_info_t x64_op_info = []
@@ -123,40 +125,20 @@ static constexpr x64_op_info_t x64_op_info = []
 
     // NOTE: rex is handled separately
 
-    // push
+    // push / pop
     for (auto r = 0; r < 8; ++r)
-    {
-        info.mnemonic[0x50 + r] = mnemonic::push;
-        info.args[0x50 + r] = arg_format::opreg;
-        info.is_always_64bit[0x50 + r] = true;
-    }
+        info.set_op64(0x50 + r, mnemonic::push, arg_format::opreg);
     for (auto r = 0; r < 8; ++r)
-    {
-        info.mnemonic[0x58 + r] = mnemonic::pop;
-        info.args[0x58 + r] = arg_format::opreg;
-        info.is_always_64bit[0x58 + r] = true;
-    }
+        info.set_op64(0x58 + r, mnemonic::pop, arg_format::opreg);
 
     // move
-    {
-        info.mnemonic[0x89] = mnemonic::mov;
-        info.fmt[0x89] = format_flag::has_modrm;
-        info.args[0x89] = arg_format::modm_modr;
-    }
-    {
-        info.mnemonic[0x8B] = mnemonic::mov;
-        info.fmt[0x8B] = format_flag::has_modrm;
-        info.args[0x8B] = arg_format::modr_modm;
-    }
-    {
-        info.mnemonic[0x8D] = mnemonic::lea;
-        info.fmt[0x8D] = format_flag::has_modrm;
-        info.args[0x8D] = arg_format::modr_modm;
-    }
+    info.set_op(0x89, mnemonic::mov, arg_format::modm_modr);
+    info.set_op(0x8B, mnemonic::mov, arg_format::modr_modm);
+    info.set_op(0x8D, mnemonic::lea, arg_format::modr_modm);
 
     // add/or/...
     {
-        info.mnemonic[0x83] = mnemonic::extended_resolve;
+        info.set_op(0x83, mnemonic::extended_resolve, arg_format::modm_imm8);
         info.mnemonic_opext[0x83 * 8 + 0] = mnemonic::add;
         info.mnemonic_opext[0x83 * 8 + 1] = mnemonic::or_;
         info.mnemonic_opext[0x83 * 8 + 2] = mnemonic::adc;
@@ -165,27 +147,16 @@ static constexpr x64_op_info_t x64_op_info = []
         info.mnemonic_opext[0x83 * 8 + 5] = mnemonic::sub;
         info.mnemonic_opext[0x83 * 8 + 6] = mnemonic::xor_;
         info.mnemonic_opext[0x83 * 8 + 7] = mnemonic::cmp;
-        info.fmt[0x83] = format_flag::has_modrm;
-        info.args[0x83] = arg_format::modm_imm8;
     }
 
     // add
-    {
-        info.mnemonic[0x03] = mnemonic::add;
-        info.fmt[0x03] = format_flag::has_modrm;
-        info.args[0x03] = arg_format::modr_modm;
-    }
+    info.set_op(0x03, mnemonic::add, arg_format::modr_modm);
 
     // call
-    {
-        info.mnemonic[0xE8] = mnemonic::call;
-        info.args[0xE8] = arg_format::imm32;
-    }
+    info.set_op(0xE8, mnemonic::call, arg_format::imm32);
 
     // ret
-    {
-        info.mnemonic[0xC3] = mnemonic::ret;
-    }
+    info.set_op(0xC3, mnemonic::ret, arg_format::none);
 
     return info;
 }();
@@ -375,7 +346,6 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     // look up primary op
     // TODO: single load?
     instr.mnemonic = x64_op_info.mnemonic[int(instr.opcode)];
-    auto fmt_flag = x64_op_info.fmt[int(instr.opcode)];
     instr.format.args = x64_op_info.args[int(instr.opcode)];
     if (instr.mnemonic == mnemonic::invalid)
     {
@@ -384,7 +354,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     }
 
     // ModR/M
-    if (fmt_flag.has(format_flag::has_modrm))
+    if (has_modrm(instr.format.args))
     {
         if (data >= end)
             return {};

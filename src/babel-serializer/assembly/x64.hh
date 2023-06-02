@@ -134,17 +134,17 @@ enum class arg_format : uint8_t
     // 0 args
     none,
 
-    // 1 arg
     opreg,
     imm32,
-    modm,
+    opreg_imm,
 
-    // 2 args
+    // has modrm
+    modm = 0b1000'0000,
     modm_modr,
     modr_modm,
-    opreg_imm,
     modm_imm8,
 };
+static constexpr bool has_modrm(arg_format f) { return uint8_t(f) >= 0b1000'0000; }
 
 /// NOTES:
 /// - offset_op is always valid, including 0

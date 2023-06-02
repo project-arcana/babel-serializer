@@ -8,16 +8,17 @@
 
 #include <rich-log/log.hh>
 
-static int test(int a, int b) { return a + b; }
+// static int test(int a, int b) { return a + b; }
+static int test(int a, int b) { return a < b ? a : b; }
 
 TEST("x64 assembly basic decode")
 {
-    auto fun = +[](int a, int b) { return a + b; };
-
     cc::set<std::byte const*> seen_starts;
     cc::ringbuffer<std::byte const*> start_queue;
     start_queue.push_back((std::byte const*)test);
-    start_queue.push_back((std::byte const*)fun);
+
+    // auto fun = +[](int a, int b) { return a + b; };
+    // start_queue.push_back((std::byte const*)fun);
 
     auto decode_block = [&](std::byte const* p_start)
     {
@@ -34,7 +35,7 @@ TEST("x64 assembly basic decode")
             if (!i.is_valid())
                 break;
 
-            LOG("%<22s %s", i.as_span(), i);
+            LOG("%s %<22s %s", i.data, i.as_span(), i);
             p_start += i.size;
 
             if (i.mnemonic == babel::x64::mnemonic::ret)
