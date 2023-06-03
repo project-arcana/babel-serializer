@@ -623,6 +623,11 @@ for (var i = 0; i < phase2_slots.Count; ++i)
 {
     var e = phase2_slots[i];
     System.Console.WriteLine($"[{i:D3}] {(e == null ? "-" : $"{e.mnemonic}/{e.trail_bin_format}/{e.primary_opcode:X}")}");
+    // if (e != null && !e.trail_bin_format.StartsWith("rm"))
+    // {
+    //     System.Console.WriteLine("ERROR: no modrm byte");
+    //     return;
+    // }
 }
 
 //
@@ -634,17 +639,83 @@ var arg_fmts = new List<string>{
     "opreg",
     "opreg64",
     "imm8",
+    "imm16",
     "imm32",
+    "imm32_64",
     "opreg_imm",
-    "modm",
+    "modm", // must be first modrm
     "modm_modr",
     "modr_modm",
     "modm_modr_imm8",
+    "modm_modr_imm32",
     "modr_modm_imm8",
     "modm_imm8",
-    "modm_imm32"
+    "modm_imm32",
+    "modm_imm32_64",
 };
 
+ushort MakeTableEntry(string mnemonic, string arg_fmt)
+{
+    int mnem = 0; // invalid
+    if (mnemonic == "_invalid")
+        mnem = 0;
+    else if (mnemonic == "_phase2")
+        mnem = 1;
+    else mnem = 2 + mnemonics!.IndexOf(mnemonic);
+
+    if (!arg_fmts.Contains(arg_fmt))
+        System.Console.WriteLine("ERROR: unknown fmt " + arg_fmt);
+
+    int arg = arg_fmts!.IndexOf(arg_fmt);
+
+    return (ushort)(mnem + (arg << 10));
+}
+
+var table = new List<ushort>();
+// phase 1
+for (var i = 0; i < 256 * 2; ++i)
+{
+    ushort tentry = 0;
+    if (!phase1_to_ops.ContainsKey(i))
+    {
+        tentry = MakeTableEntry("_invalid", "none");
+    }
+    else
+    {
+        var es = phase1_to_ops[i];
+
+        if (es.Count > 1)
+        {
+            tentry = MakeTableEntry("_phase2", "none");
+        }
+        else
+        {
+            var e = es[0];
+            tentry = MakeTableEntry(e.mnemonic, e.arg_format);
+        }
+    }
+    table.Add(tentry);
+}
+// phase 2
+for (var i = 0; i < phase2_slots.Count; ++i)
+{
+    ushort tentry = 0;
+    var e = phase2_slots[i];
+    if (e == null)
+        tentry = MakeTableEntry("_invalid", "none");
+    else
+        tentry = MakeTableEntry(e.mnemonic, e.arg_format);
+    table.Add(tentry);
+}
+
+var table_str = "";
+for (var i = 0; i < table.Count; ++i)
+{
+    table_str += table[i];
+    table_str += ",";
+    if (i % 16 == 15)
+        table_str += "\n";
+}
 
 var hh = @$"#pragma once
 // CAUTION: this file is auto-generated. DO NOT MODIFY!
@@ -657,15 +728,23 @@ namespace babel::x64
 enum class mnemonic : uint16_t 
 {{
     _invalid,
-    _subresolve,
+    _phase2,
 
     {string.Join(",\n    ", mnemonics.Select(s => SafeMnemonic(s)))}
 }};
 char const* to_string(mnemonic m);
 
+// TODO: decode instruction such that arguments are fixed size
+enum class arg_format : uint8_t
+{{
+    {string.Join(",\n    ", arg_fmts)}
+}};
+static_assert(int(arg_format::{arg_fmts.Last()}) <= 0b11111);
+static constexpr bool has_modrm(arg_format f) {{ return f >= arg_format::modm; }}
+
 namespace detail
 {{
-extern uint16_t const decode_table[];
+extern uint16_t const decode_table[{table.Count}];
 }}
 
 }} // babel::x64
@@ -688,6 +767,11 @@ char const* babel::x64::to_string(mnemonic m)
         return ""<unknown-mnemonic>"";
     return s_mnemonic_names[int(m)];
 }}
+
+uint16_t const babel::x64::detail::decode_table[{table.Count}] =
+{{
+{table_str}
+}};
 
 ";
 

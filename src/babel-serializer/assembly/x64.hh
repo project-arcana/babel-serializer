@@ -105,31 +105,6 @@ constexpr char const* to_string(reg32 r)
     return "r<unknown>";
 }
 
-// syntax is roughly that used in https://www.felixcloutier.com/x86/mov
-enum class arg_format : uint8_t
-{
-    // 0 args
-    none,
-
-    opreg,
-    opreg64, // always 64bit
-    imm8,
-    imm32,
-    opreg_imm,
-
-    // has modrm
-    has_modm_start,
-    modm = has_modm_start,
-    modm_modr,
-    modr_modm,
-    modm_modr_imm8,
-    modr_modm_imm8,
-    modm_imm8,
-    modm_imm32,
-};
-static_assert(int(arg_format::modm_imm32) <= 0b1111);
-static constexpr bool has_modrm(arg_format f) { return f >= arg_format::has_modm_start; }
-
 /// a decoded instruction
 /// is guaranteed to be valid if data is not nullptr (no out-of-bound reads)
 /// NOTE: this is only a "base" decoding
@@ -166,6 +141,10 @@ struct instruction
         //       in particular, SSE ops like 66 0F 3A 0C (blendps) must not alias with CMP
         // NOTE: opcode & 0b111 must keep op-encoded register
         // NOTE: this is kinda sparse in the upper parts right now
+        // TODO: use less than 16 bit
+        // use:
+        //  - for normal 1byte 2byte ops, this & 0xFF should give the opcode
+        //  - used as index into internal tables for printing / metadata
         uint16_t opcode = 0;
 
         // currently ~660 mnemonics
@@ -176,7 +155,7 @@ struct instruction
         uint8_t size : 4 = 0;
 
         // packed version of arg_format
-        uint8_t args_packed : 4 = 0;
+        uint8_t args_packed : 5 = 0;
 
         // lower 4 bits of rex
         uint8_t rex : 4 = 0;
@@ -230,27 +209,32 @@ inline int32_t int32_immediate_of(instruction const& i)
     return *(int32_t const*)(i.data + i.offset_immediate);
 }
 
-inline bool is_conditional_jump(instruction const& i) { return i.op_group == 1 && uint8_t(i.opcode) >= 0x80 && uint8_t(i.opcode) <= 0x8F; }
+inline bool is_conditional_jump(instruction const& i)
+{
+    return (i.opcode >= 0x70 && i.opcode <= 0x7F) || //
+           (i.opcode >= 0x0F80 && i.opcode <= 0x0F8F);
+}
 inline std::byte const* conditional_jump_target(instruction const& i)
 {
     CC_ASSERT(is_conditional_jump(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
-inline bool is_unconditional_jump(instruction const& i) { return i.mnemonic == mnemonic::jmp; }
+inline bool is_unconditional_jump(instruction const& i) { return i.mnemonic() == mnemonic::jmp; }
 inline std::byte const* unconditional_jump_target(instruction const& i)
 {
     CC_ASSERT(is_unconditional_jump(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
-inline bool is_relative_call(instruction const& i) { return i.op_group == 0 && i.opcode == std::byte(0xE8); }
+// TODO: others?
+inline bool is_relative_call(instruction const& i) { return i.opcode == 0xE8; }
 inline std::byte const* relative_call_target(instruction const& i)
 {
     CC_ASSERT(is_relative_call(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
-inline bool is_return(instruction const& i) { return i.mnemonic == mnemonic::retn; }
+inline bool is_return(instruction const& i) { return i.mnemonic() == mnemonic::retn; }
 
 } // namespace babel::x64

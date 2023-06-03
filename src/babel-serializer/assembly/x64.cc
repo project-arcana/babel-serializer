@@ -75,202 +75,8 @@ uint8_t sib_index_of(std::byte b, uint8_t rex) { return ((uint8_t(b) >> 3) & 0b1
 uint8_t sib_base_of(std::byte b, uint8_t rex) { return (uint8_t(b) & 0b111) + (is_rex_b(rex) ? 8 : 0); }
 
 //
-// Tables
+// Formatting
 //
-
-enum class subres_entry
-{
-    prim_81,
-    prim_83,
-    prim_C1,
-    prim_FF,
-};
-
-struct x64_op_info_t
-{
-    // if mnemonic is sub_resolve
-    // then args contains offset into _sub table
-    // which then serves +0..7
-    x64::mnemonic mnemonic[256] = {};
-    arg_format args[256] = {};
-
-    constexpr void set_op(uint8_t code, x64::mnemonic m, arg_format args)
-    {
-        CC_ASSERT(this->mnemonic[code] == x64::mnemonic::_invalid && "already set");
-        this->mnemonic[code] = m;
-        this->args[code] = args;
-    }
-    constexpr void set_subres(uint8_t code, subres_entry target)
-    {
-        CC_ASSERT(this->mnemonic[code] == x64::mnemonic::_invalid && "already set");
-        this->mnemonic[code] = x64::mnemonic::_subresolve;
-        this->args[code] = arg_format(uint8_t(target) * 8);
-    }
-};
-
-// first byte opcode
-/*static constexpr x64_op_info_t x64_op_info = []
-{
-    // TODO: generate me
-    x64_op_info_t info;
-
-    // NOTE: rex is handled separately
-
-    // push / pop
-    for (auto r = 0; r < 8; ++r)
-        info.set_op(0x50 + r, mnemonic::push, arg_format::opreg64);
-    for (auto r = 0; r < 8; ++r)
-        info.set_op(0x58 + r, mnemonic::pop, arg_format::opreg64);
-
-    // move
-    info.set_op(0xC7, mnemonic::mov, arg_format::modm_imm32);
-    info.set_op(0x89, mnemonic::mov, arg_format::modm_modr);
-    info.set_op(0x8B, mnemonic::mov, arg_format::modr_modm);
-    info.set_op(0x8D, mnemonic::lea, arg_format::modr_modm);
-
-    // shift / rot
-    info.set_subres(0xC1, subres_entry::prim_C1);
-
-    // add/or/...
-    {
-        // extended
-        info.set_subres(0x81, subres_entry::prim_81);
-        info.set_subres(0x83, subres_entry::prim_83);
-
-        // non-extended
-        info.set_op(0x01, mnemonic::add, arg_format::modm_modr);
-        info.set_op(0x03, mnemonic::add, arg_format::modr_modm);
-        info.set_op(0x29, mnemonic::sub, arg_format::modm_modr);
-        info.set_op(0x2B, mnemonic::sub, arg_format::modr_modm);
-        info.set_op(0x31, mnemonic::xor_, arg_format::modm_modr);
-        info.set_op(0x33, mnemonic::xor_, arg_format::modr_modm);
-        info.set_op(0x39, mnemonic::cmp, arg_format::modm_modr);
-        info.set_op(0x3B, mnemonic::cmp, arg_format::modr_modm);
-    }
-
-    // test
-    info.set_op(0x85, mnemonic::test, arg_format::modm_modr);
-
-    // call
-    info.set_op(0xE8, mnemonic::call, arg_format::imm32);
-
-    // jmp
-    info.set_op(0x70, mnemonic::jo, arg_format::imm8);
-    info.set_op(0x71, mnemonic::jno, arg_format::imm8);
-    info.set_op(0x72, mnemonic::jb, arg_format::imm8);
-    info.set_op(0x73, mnemonic::jae, arg_format::imm8);
-    info.set_op(0x74, mnemonic::je, arg_format::imm8);
-    info.set_op(0x75, mnemonic::jne, arg_format::imm8);
-    info.set_op(0x76, mnemonic::jbe, arg_format::imm8);
-    info.set_op(0x77, mnemonic::ja, arg_format::imm8);
-    info.set_op(0x78, mnemonic::js, arg_format::imm8);
-    info.set_op(0x79, mnemonic::jns, arg_format::imm8);
-    info.set_op(0x7A, mnemonic::jpe, arg_format::imm8);
-    info.set_op(0x7B, mnemonic::jpo, arg_format::imm8);
-    info.set_op(0x7C, mnemonic::jl, arg_format::imm8);
-    info.set_op(0x7D, mnemonic::jge, arg_format::imm8);
-    info.set_op(0x7E, mnemonic::jle, arg_format::imm8);
-    info.set_op(0x7F, mnemonic::jg, arg_format::imm8);
-    info.set_op(0xE9, mnemonic::jmp, arg_format::imm32);
-
-    // ret
-    info.set_op(0xC3, mnemonic::retn, arg_format::none);
-
-    // various
-    info.set_subres(0xFF, subres_entry::prim_FF);
-
-    return info;
-}();
-
-// 0F + opcode
-static constexpr x64_op_info_t x64_op_info_0F = []
-{
-    // TODO: generate me
-    x64_op_info_t info;
-
-    // cmovs
-    info.set_op(0x40, mnemonic::cmovo, arg_format::modr_modm);
-    info.set_op(0x41, mnemonic::cmovno, arg_format::modr_modm);
-    info.set_op(0x42, mnemonic::cmovb, arg_format::modr_modm);
-    info.set_op(0x43, mnemonic::cmovnb, arg_format::modr_modm);
-    info.set_op(0x44, mnemonic::cmovz, arg_format::modr_modm);
-    info.set_op(0x45, mnemonic::cmovnz, arg_format::modr_modm);
-    info.set_op(0x46, mnemonic::cmovbe, arg_format::modr_modm);
-    info.set_op(0x47, mnemonic::cmova, arg_format::modr_modm);
-    info.set_op(0x48, mnemonic::cmovs, arg_format::modr_modm);
-    info.set_op(0x49, mnemonic::cmovns, arg_format::modr_modm);
-    info.set_op(0x4A, mnemonic::cmovp, arg_format::modr_modm);
-    info.set_op(0x4B, mnemonic::cmovnp, arg_format::modr_modm);
-    info.set_op(0x4C, mnemonic::cmovl, arg_format::modr_modm);
-    info.set_op(0x4D, mnemonic::cmovge, arg_format::modr_modm);
-    info.set_op(0x4E, mnemonic::cmovle, arg_format::modr_modm);
-    info.set_op(0x4F, mnemonic::cmovg, arg_format::modr_modm);
-
-    // jumps
-    info.set_op(0x80, mnemonic::jo, arg_format::imm32);
-    info.set_op(0x81, mnemonic::jno, arg_format::imm32);
-    info.set_op(0x82, mnemonic::jb, arg_format::imm32);
-    info.set_op(0x83, mnemonic::jae, arg_format::imm32);
-    info.set_op(0x84, mnemonic::je, arg_format::imm32);
-    info.set_op(0x85, mnemonic::jne, arg_format::imm32);
-    info.set_op(0x86, mnemonic::jbe, arg_format::imm32);
-    info.set_op(0x87, mnemonic::ja, arg_format::imm32);
-    info.set_op(0x88, mnemonic::js, arg_format::imm32);
-    info.set_op(0x89, mnemonic::jns, arg_format::imm32);
-    info.set_op(0x8A, mnemonic::jpe, arg_format::imm32);
-    info.set_op(0x8B, mnemonic::jpo, arg_format::imm32);
-    info.set_op(0x8C, mnemonic::jl, arg_format::imm32);
-    info.set_op(0x8D, mnemonic::jge, arg_format::imm32);
-    info.set_op(0x8E, mnemonic::jle, arg_format::imm32);
-    info.set_op(0x8F, mnemonic::jg, arg_format::imm32);
-
-    return info;
-}();*/
-
-// subop
-static constexpr x64_op_info_t x64_op_info_sub = []
-{
-    // TODO: generate me
-    x64_op_info_t info;
-
-    // shift / rot
-    {
-        auto const args = arg_format::modm_imm8;
-        auto const base = uint8_t(subres_entry::prim_C1) * 8;
-        info.set_op(base + 0, mnemonic::rol, args);
-        info.set_op(base + 1, mnemonic::ror, args);
-        info.set_op(base + 2, mnemonic::rcl, args);
-        info.set_op(base + 3, mnemonic::rcr, args);
-        info.set_op(base + 4, mnemonic::sal, args);
-        info.set_op(base + 5, mnemonic::shr, args);
-        info.set_op(base + 6, mnemonic::sal, args);
-        info.set_op(base + 7, mnemonic::sar, args);
-    }
-
-    // add / and / or / ...
-    for (auto code : {subres_entry::prim_81, subres_entry::prim_83})
-    {
-        auto const args = code == subres_entry::prim_81 ? arg_format::modm_imm32 : arg_format::modm_imm8;
-        auto const base = uint8_t(code) * 8;
-        info.set_op(base + 0, mnemonic::add, args);
-        info.set_op(base + 1, mnemonic::or_, args);
-        info.set_op(base + 2, mnemonic::adc, args);
-        info.set_op(base + 3, mnemonic::sbb, args);
-        info.set_op(base + 4, mnemonic::and_, args);
-        info.set_op(base + 5, mnemonic::sub, args);
-        info.set_op(base + 6, mnemonic::xor_, args);
-        info.set_op(base + 7, mnemonic::cmp, args);
-    }
-
-    // 0xFF
-    {
-        // auto const base = uint8_t(subres_entry::prim_FF) * 8;
-        // TODO
-        // info.set_op(base + 3, mnemonic::call, )
-    }
-
-    return info;
-}();
 
 void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
 {
@@ -427,6 +233,14 @@ void add_imm8_to_string(cc::string& s, babel::x64::instruction const& in)
     s += cc::to_string(in.data[in.offset_immediate]);
 }
 
+void add_imm16_to_string(cc::string& s, babel::x64::instruction const& in)
+{
+    CC_ASSERT(in.offset_immediate > 0 && "no immediate available");
+    s += "0x";
+    for (auto i = 1; i >= 0; --i)
+        s += cc::to_string(in.data[in.offset_immediate + i]);
+}
+
 void add_imm32_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     CC_ASSERT(in.offset_immediate > 0 && "no immediate available");
@@ -451,12 +265,12 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     auto op = *data++;
 
     // parse prefixes
-    auto pref_0F = false;  // two-byte opcodes
-    auto pref_66 = false;  // size prefix | op sel
-    auto pref_67 = false;  // addr size prefix
-    auto pref_F2 = false;  // rep
-    auto pref_F3 = false;  // rep
-    auto pref_F0 = false;  // lock
+    auto pref_0F = false; // two-byte opcodes
+    auto pref_66 = false; // size prefix | op sel
+    auto pref_67 = false; // addr size prefix
+    auto pref_F2 = false; // rep
+    auto pref_F3 = false; // rep
+    auto pref_F0 = false; // lock
 
     auto check_for_prefixes = true;
     while (check_for_prefixes)
@@ -513,17 +327,19 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     // two tables can be directly addressed
     //   one-byte ops from 0x000..0x0FF
     //   two-byte ops from 0x100..0x1FF
+    auto has_phase2 = false;
     {
         auto dec_idx = int(op);
         if (pref_0F)
             dec_idx += 0xFF;
 
         // 10 bit mnemonic
-        //  4 bit args
-        //  2 bit status
+        //  5 bit args
+        //  1 bit phase2
         auto dec = detail::decode_table[dec_idx];
         mnem = mnemonic(dec & 0b11'1111'1111);
-        args = arg_format((dec >> 10) & 0b1111);
+        args = arg_format((dec >> 10) & 0b11111);
+        has_phase2 = (dec & 0b1000'0000'0000'0000) != 0;
     }
 
     // unknown op?
@@ -538,7 +354,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     // - those are marked as subresolve in the 1st phase lookup
 
     // ModR/M
-    if (mnem == mnemonic::_subresolve || has_modrm(args))
+    if (has_modrm(args))
     {
         if (data >= end)
             return {};
@@ -600,8 +416,15 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
         // special
         CC_ASSERT(!(mod == modrm_mode::register_indirect && modrm_rm_of(modrm) == 0b101) && "TODO: implement RIP/EIP+disp32");
     }
+    // phase2 but no ModR/M
+    else if (has_phase2)
+    {
+        // TODO
+        TODO
+    }
 
     // immediate args
+    // TODO: disentangled args => only need to do immediates here
     switch (args)
     {
     case arg_format::opreg_imm:
@@ -609,12 +432,23 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
         break;
 
     case arg_format::imm32:
+    case arg_format::imm32_64: // TODO: make part of decoding
     case arg_format::modm_imm32:
+    case arg_format::modm_imm32_64: // TODO: make part of decoding
+    case arg_format::modm_modr_imm32:
         if (data + 3 >= end)
             return {};
         instr.offset_immediate = data - instr.data;
         instr.size_immediate = 2;
         data += 4;
+        break;
+
+    case arg_format::imm16:
+        if (data + 1 >= end)
+            return {};
+        instr.offset_immediate = data - instr.data;
+        instr.size_immediate = 1;
+        data += 2;
         break;
 
     case arg_format::imm8:
@@ -673,7 +507,16 @@ cc::string babel::x64::instruction::to_string() const
         s += ' '; // TODO: pad?
         add_imm8_to_string(s, *this);
         break;
+    case arg_format::imm16:
+        s += ' '; // TODO: pad?
+        add_imm16_to_string(s, *this);
+        break;
     case arg_format::imm32:
+        s += ' '; // TODO: pad?
+        add_imm32_to_string(s, *this);
+        break;
+    case arg_format::imm32_64:
+        // TODO: 64?
         s += ' '; // TODO: pad?
         add_imm32_to_string(s, *this);
         break;
@@ -710,6 +553,13 @@ cc::string babel::x64::instruction::to_string() const
         s += ", ";
         add_imm32_to_string(s, *this);
         break;
+    case arg_format::modm_imm32_64:
+        // TODO: 64?
+        s += ' '; // TODO: pad?
+        add_modm_to_string(s, *this);
+        s += ", ";
+        add_imm32_to_string(s, *this);
+        break;
 
         // 3 args
     case arg_format::modm_modr_imm8:
@@ -719,6 +569,14 @@ cc::string babel::x64::instruction::to_string() const
         add_modr_to_string(s, *this);
         s += ", ";
         add_imm8_to_string(s, *this);
+        break;
+    case arg_format::modm_modr_imm32:
+        s += ' '; // TODO: pad?
+        add_modm_to_string(s, *this);
+        s += ", ";
+        add_modr_to_string(s, *this);
+        s += ", ";
+        add_imm32_to_string(s, *this);
         break;
     case arg_format::modr_modm_imm8:
         s += ' '; // TODO: pad?

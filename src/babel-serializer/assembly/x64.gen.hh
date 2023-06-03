@@ -6,10 +6,10 @@
 namespace babel::x64
 {
 
-enum class mnemonic : uint16_t 
+enum class mnemonic : uint16_t
 {
     _invalid,
-    _subresolve,
+    _phase2,
 
     adc,
     add,
@@ -407,9 +407,32 @@ enum class mnemonic : uint16_t
 };
 char const* to_string(mnemonic m);
 
+enum class arg_format : uint8_t
+{
+    none,
+    opreg,
+    opreg64,
+    imm8,
+    imm16,
+    imm32,
+    imm32_64,
+    opreg_imm,
+    modm,
+    modm_modr,
+    modr_modm,
+    modm_modr_imm8,
+    modm_modr_imm32,
+    modr_modm_imm8,
+    modm_imm8,
+    modm_imm32,
+    modm_imm32_64
+};
+static_assert(int(arg_format::modm_imm32_64) <= 0b11111);
+static constexpr bool has_modrm(arg_format f) { return f >= arg_format::modm; }
+
 namespace detail
 {
-extern uint16_t const decode_table[];
+extern uint16_t const decode_table[793];
 }
 
 } // babel::x64
