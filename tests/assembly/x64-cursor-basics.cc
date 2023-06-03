@@ -18,6 +18,13 @@ static int test_sum(cc::span<int const> vals)
         s += i;
     return s;
 }
+static int test_sum2(int* a, int *b)
+{
+    auto s = 0;
+    while (a != b)
+        s += *a++;
+    return s;
+}
 
 TEST("x64 assembly basic decode")
 {
@@ -26,7 +33,7 @@ TEST("x64 assembly basic decode")
     // start_queue.push_back((std::byte const*)test_abs);
     // start_queue.push_back((std::byte const*)test_add);
     // start_queue.push_back((std::byte const*)test_min);
-    start_queue.push_back((std::byte const*)test_sum);
+    start_queue.push_back((std::byte const*)test_sum2);
 
     // auto fun = +[](int a, int b) { return a + b; };
     // start_queue.push_back((std::byte const*)fun);

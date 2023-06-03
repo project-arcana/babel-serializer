@@ -7,6 +7,8 @@
 #include <clean-core/span.hh>
 #include <clean-core/string.hh>
 
+#include "x64.gen.hh"
+
 namespace babel::x64
 {
 enum class reg64 : uint8_t
@@ -103,78 +105,6 @@ constexpr char const* to_string(reg32 r)
     return "r<unknown>";
 }
 
-enum class mnemonic : uint8_t
-{
-    invalid,
-    _sub_resolve,
-
-    push,
-    pop,
-
-    mov,
-    lea,
-
-    call,
-    ret,
-
-    test,
-
-    add,
-    or_,
-    adc,
-    sbb,
-    and_,
-    sub,
-    xor_,
-    cmp,
-
-    rol,
-    ror,
-    rcl,
-    rcr,
-    shl,
-    shr,
-    sal,
-    sar,
-
-    jmp,
-
-    jo,
-    jno,
-    jb,
-    jnb,
-    je,
-    jne,
-    jbe,
-    ja,
-    js,
-    jns,
-    jp,
-    jnp,
-    jl,
-    jge,
-    jle,
-    jg,
-
-    cmovo,
-    cmovno,
-    cmovb,
-    cmovnb,
-    cmovz,
-    cmovnz,
-    cmovbe,
-    cmova,
-    cmovs,
-    cmovns,
-    cmovp,
-    cmovnp,
-    cmovl,
-    cmovge,
-    cmovle,
-    cmovg,
-};
-char const* to_string(mnemonic m);
-
 // syntax is roughly that used in https://www.felixcloutier.com/x86/mov
 enum class arg_format : uint8_t
 {
@@ -188,38 +118,15 @@ enum class arg_format : uint8_t
     opreg_imm,
 
     // has modrm
-    modm = 0b1000'0000,
+    has_modm_start,
+    modm = has_modm_start,
     modm_modr,
     modr_modm,
     modm_imm8,
     modm_imm32,
 };
-static constexpr bool has_modrm(arg_format f) { return uint8_t(f) >= 0b1000'0000; }
-
-/// NOTES:
-/// - offset_op is always valid, including 0
-/// - offsets for modrm/sib/displ/imm cannot be 0 when present, so 0 means absent
-/// - size of imm/disp is 1/2/4/8
-struct instruction_format
-{
-    uint8_t offset_op : 3 = 0;
-    uint8_t offset_modrm : 3 = 0;
-    // 0 = primary
-    // 1 = secondary
-    // 2 = primary -> subop
-    uint8_t op_group : 2 = 0;
-
-    uint8_t offset_sib : 4 = 0;
-    uint8_t offset_displacement : 4 = 0;
-
-    uint8_t offset_immediate : 4 = 0;
-    // size = 8/16/32/64
-    uint8_t size_immediate : 2 = 0;
-    uint8_t size_displacement : 2 = 0;
-
-    arg_format args;
-};
-static_assert(sizeof(instruction_format) <= 4);
+static_assert(int(arg_format::modm_imm32) <= 0b1111);
+static constexpr bool has_modrm(arg_format f) { return f >= arg_format::has_modm_start; }
 
 /// a decoded instruction
 /// is guaranteed to be valid if data is not nullptr (no out-of-bound reads)
@@ -242,16 +149,58 @@ struct instruction
     // location of the first instruction byte
     std::byte const* data = nullptr;
 
-    // we have 8 bytes here to use (so each instruction is 16B in memory)
+    /// we have 8 bytes here to use (so each instruction is 16B in memory)
+    struct
+    {
+        // opcode with group encoded
+        // as a single u16 to prevent accidental aliasing
+        // lower u8 is the "normal" opcode
+        // higher u8 is:
+        //   0x00       - single-byte opcodes
+        //   0x00..0x07 - single-byte opcodes with subresolve (e.g. 0x80 add/or/adc/...)
+        //
+        // NOTE: higher u8 is chosen so
+        //       opcode -> mnemonic is actually a function
+        //       in particular, SSE ops like 66 0F 3A 0C (blendps) must not alias with CMP
+        // NOTE: opcode & 0b111 must keep op-encoded register
+        uint16_t opcode = 0;
 
-    // 1-15 bytes for x64
-    uint8_t size = 0;
-    x64::mnemonic mnemonic = x64::mnemonic::invalid;
-    std::byte rex = std::byte(0);    // 0 if not present
-    std::byte opcode = std::byte(0); // primary opcode byte
+        // currently ~660 mnemonics
+        // stored directly because it's accessed frequently
+        uint16_t mnemonic_packed : 10 = 0;
 
-    // 4B encoding of format
-    instruction_format format;
+        // 1-15 bytes for x64
+        uint8_t size : 4 = 0;
+
+        // packed version of arg_format
+        uint8_t args_packed : 4 = 0;
+
+        // lower 4 bits of rex
+        uint8_t rex : 4 = 0;
+
+        // is always valid, including 0
+        uint8_t offset_op : 3 = 0;
+        // 0 means "no ModR/M byte"
+        uint8_t offset_modrm : 3 = 0;
+        // SIB is always ModR/M + 1
+
+        // 0 means "no displacement"
+        uint8_t offset_displacement : 4 = 0;
+
+        // 0 means "no immediate"
+        uint8_t offset_immediate : 4 = 0;
+        // size = 8/16/32/64
+        uint8_t size_immediate : 2 = 0;
+        uint8_t size_displacement : 2 = 0;
+
+        // .. we are currently at exactly 64 bits
+    };
+
+    // convenience unpacking
+    // NOTE: no mem access, just some casting
+public:
+    x64::mnemonic mnemonic() const { return x64::mnemonic(mnemonic_packed); }
+    x64::arg_format arg_format() const { return x64::arg_format(args_packed); }
 
     // properties
 public:
@@ -273,12 +222,12 @@ instruction decode_one(std::byte const* data, std::byte const* end);
 
 inline int32_t int32_immediate_of(instruction const& i)
 {
-    CC_ASSERT(i.format.offset_immediate > 0 && "instruction has no immediate");
-    CC_ASSERT(i.format.size_immediate == 2 && "instruction immediate has wrong size");
-    return *(int32_t const*)(i.data + i.format.offset_immediate);
+    CC_ASSERT(i.offset_immediate > 0 && "instruction has no immediate");
+    CC_ASSERT(i.size_immediate == 2 && "instruction immediate has wrong size");
+    return *(int32_t const*)(i.data + i.offset_immediate);
 }
 
-inline bool is_conditional_jump(instruction const& i) { return i.format.op_group == 1 && uint8_t(i.opcode) >= 0x80 && uint8_t(i.opcode) <= 0x8F; }
+inline bool is_conditional_jump(instruction const& i) { return i.op_group == 1 && uint8_t(i.opcode) >= 0x80 && uint8_t(i.opcode) <= 0x8F; }
 inline std::byte const* conditional_jump_target(instruction const& i)
 {
     CC_ASSERT(is_conditional_jump(i));
@@ -292,13 +241,13 @@ inline std::byte const* unconditional_jump_target(instruction const& i)
     return i.data + i.size + int32_immediate_of(i);
 }
 
-inline bool is_relative_call(instruction const& i) { return i.format.op_group == 0 && i.opcode == std::byte(0xE8); }
+inline bool is_relative_call(instruction const& i) { return i.op_group == 0 && i.opcode == std::byte(0xE8); }
 inline std::byte const* relative_call_target(instruction const& i)
 {
     CC_ASSERT(is_relative_call(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
-inline bool is_return(instruction const& i) { return i.mnemonic == mnemonic::ret; }
+inline bool is_return(instruction const& i) { return i.mnemonic == mnemonic::retn; }
 
 } // namespace babel::x64
