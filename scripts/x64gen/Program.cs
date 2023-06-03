@@ -66,6 +66,195 @@ string NormalizeMnemonic(string s)
     }
     return s;
 }
+string SafeMnemonic(string s)
+{
+    switch (s)
+    {
+        case "and": return "and_";
+        case "or": return "or_";
+        case "xor": return "xor_";
+        case "int": return "int_";
+        case "not": return "not_";
+        default:
+            return s;
+    }
+}
+string AddrOfOp(XElement? e) => e?.Element("a")?.Value ?? e?.Attribute("address")?.Value ?? e?.Value ?? "";
+string TypeOfOp(XElement? e) => e?.Element("t")?.Value ?? e?.Attribute("type")?.Value ?? "";
+var entries = new List<OpEntry>();
+void ProcessEntry(XElement entry, XElement syntax, string mnemonic)
+{
+    if (entry.Parent!.Name != "pri_opcd")
+        throw new InvalidOperationException("expected pri_opcd as parent");
+
+    // any mnemonic seens is recorded
+    mnemonics_set.Add(mnemonic);
+
+    // FIXME: 
+    //  syntax:
+    //     mnem
+    //     op0
+    //     op1
+    // NOT ALWAYS dst src or src dst but also src src
+    
+    var src = AddrOfOp(syntax.Element("src"));
+    var dst = AddrOfOp(syntax.Element("dst"));
+    var src_t = TypeOfOp(syntax.Element("src"));
+    var dst_t = TypeOfOp(syntax.Element("dst"));
+    var pri_opcd = entry.Parent.Attribute("value")!.Value;
+    var pri_opcode = int.Parse(pri_opcd, System.Globalization.NumberStyles.HexNumber);
+
+    var op_cat = entry.Parent!.Parent!.Name;
+    var is_one_byte = op_cat == "one-byte";
+    var is_two_byte = op_cat == "two-byte"; // 0x0F
+    var cat = is_one_byte ? "one" :
+              is_two_byte ? "two" :
+              throw new InvalidOperationException();
+
+    // TODO: print hints
+    // SC/AL/... are fixed implicit args and not encoded
+    bool isEmptyArg(string s) => s == "" || s == "SC" || s == "AL" || s == "eAX" || s == "rAX" || s == "rCX" || s == "rBP" || s == "X" || s == "Y";
+    bool isOpReg(string s) => s == "Z";
+    // O is some kind of offset, treated as immediate for decoding
+    bool isImmediate(string s) => s == "J" || s == "I" || s == "A" || s == "O";
+    bool isModR(string s) => s == "G" || s == "V" || s == "P";
+    bool isModM(string s) => s == "E" || s == "W" || s == "Q" || s == "M" || s == "U";
+    string ImmTypeOf(string t)
+    {
+        switch (t)
+        {
+            case "b":
+            case "bs": // sign extended
+            case "bss": // sign extended to stack ptr size
+                return "8";
+
+            // "The most important part is ds code, which means doubleword, sign-extended to 64 bits for 64-bit operand size."
+            // TODO: is 16 bit with 0x66 size prefix
+            case "vds":
+                return "32";
+            case "vs":
+                return "32";
+
+            // promoted by REX.W
+            case "vqp":
+                return "32_64";
+
+            case "w":
+                return "16";
+        }
+        System.Console.WriteLine($"unknown immediate type '{t}' for {mnemonic} {pri_opcd}");
+        return "";
+    }
+    var has_dst = !isEmptyArg(dst);
+    var has_src = !isEmptyArg(src);
+
+    var extended_op = entry.Element("opcd_ext")?.Value;
+    var is_extended = !string.IsNullOrEmpty(extended_op);
+
+    // int3 is weirdly defined in the doc
+    if (is_one_byte && pri_opcd == "CC")
+    {
+        has_src = false;
+        has_dst = false;
+    }
+    // this mov is treated as opcode extended for some reason...
+    if (is_one_byte && pri_opcd == "C7")
+    {
+        is_extended = false;
+    }
+
+    // invalid ops
+    if (!is_extended)
+    {
+        var is_non_64bit = entry.Attribute("mode")?.Value != "e";
+        var has_64bit_siblings = entry.Parent!.Elements("entry").Any(e => e.Attribute("mode")?.Value == "e");
+
+        // ignore non-64bit ops if we are not extended and have 64bit siblings
+        if (is_non_64bit && has_64bit_siblings)
+            return;
+    }
+
+    // TODO: they require special entries
+    if (is_extended)
+        return;
+
+    // no args
+    if (!has_src && !has_dst)
+    {
+        entries.Add(new OpEntry
+        {
+            category = cat,
+            mnemonic = mnemonic,
+            primary_opcode = pri_opcode,
+            arg_format = "none",
+        });
+    }
+    // opreg, like push/pop
+    else if ((isOpReg(src) && !has_dst) || (isOpReg(dst) && !has_src))
+    {
+        for (var i = 0; i < 8; ++i)
+            entries.Add(new OpEntry
+            {
+                category = cat,
+                mnemonic = mnemonic,
+                primary_opcode = pri_opcode + i,
+                arg_format = src_t == "vq" || dst_t == "vq" ? "opreg64" : "opreg",
+            });
+    }
+    // only immediate
+    else if ((isImmediate(src) && !has_dst) || (isImmediate(dst) && !has_src))
+    {
+        var immtype = has_src ? ImmTypeOf(src_t) : ImmTypeOf(dst_t);
+        entries.Add(new OpEntry
+        {
+            category = cat,
+            mnemonic = mnemonic,
+            primary_opcode = pri_opcode,
+            arg_format = "imm" + immtype,
+        });
+    }
+    // pure ModR/M
+    else if (isModR(dst) && isModM(src))
+    {
+        // if (src_t == "vqp" && dst_t == "vqp")
+        entries.Add(new OpEntry
+        {
+            category = cat,
+            mnemonic = mnemonic,
+            primary_opcode = pri_opcode,
+            arg_format = "modr_modm",
+        });
+        // TODO: type hints for printing
+    }
+    else if (isModM(dst) && isModR(src))
+    {
+        // if (src_t == "vqp" && dst_t == "vqp")
+        entries.Add(new OpEntry
+        {
+            category = cat,
+            mnemonic = mnemonic,
+            primary_opcode = pri_opcode,
+            arg_format = "modm_modr",
+        });
+        // TODO: type hints for printing
+    }
+    else if (src == "I" && isModM(dst))
+    {
+        // if (src_t == "vds" && dst_t == "vqp")
+        entries.Add(new OpEntry
+        {
+            category = cat,
+            mnemonic = mnemonic,
+            primary_opcode = pri_opcode,
+            arg_format = "modm_imm32",
+        });
+        // TODO: type hints for printing
+    }
+    else
+    {
+        System.Console.WriteLine($"TODO: decode entry for {cat} {pri_opcd} {mnemonic} | {dst}:{dst_t} {src}:{src_t}");
+    }
+}
 foreach (var entry in refdoc.Descendants("entry"))
 {
     var amode = entry.Attribute("mode");
@@ -82,32 +271,37 @@ foreach (var entry in refdoc.Descendants("entry"))
             continue;
 
         var s = NormalizeMnemonic(mnem);
+
+        // rex prefix
         if (s == "rex" || s.StartsWith("rex."))
             continue;
 
-        mnemonics_set.Add(s);
+        // segment / branch prefix
+        if (s == "alter" || s == "fs" || s == "gs")
+            continue;
+
+        // lock prefix
+        if (s == "lock")
+            continue;
+
+        ProcessEntry(entry, syntax, s);
+
+        // only process the first valid syntax node per entry
+        break;
     }
 }
 var mnemonics = mnemonics_set.OrderBy(s => s).ToList();
-string SafeMnemonic(string s)
-{
-    switch (s)
-    {
-        case "and": return "and_";
-        case "or": return "or_";
-        case "xor": return "xor_";
-        case "int": return "int_";
-        case "not": return "not_";
-        default:
-            return s;
-    }
-}
 System.Console.WriteLine($"found {mnemonics.Count} mnemonics");
 if (mnemonics.Count > 4 * 256 - 2)
 {
     System.Console.WriteLine("ERROR: too many mnemonics! 10 bit assumption violated!");
     return;
 }
+
+// DEBUG
+foreach (var e in entries)
+    System.Console.WriteLine($"info_{e.category}.set_op(0x{e.primary_opcode.ToString("X").PadLeft(2, '0')}, mnemonic::{SafeMnemonic(e.mnemonic)}, arg_format::{e.arg_format});");
+
 
 //
 // generate file
