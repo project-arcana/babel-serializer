@@ -122,6 +122,8 @@ enum class arg_format : uint8_t
     modm = has_modm_start,
     modm_modr,
     modr_modm,
+    modm_modr_imm8,
+    modr_modm_imm8,
     modm_imm8,
     modm_imm32,
 };
@@ -163,6 +165,7 @@ struct instruction
         //       opcode -> mnemonic is actually a function
         //       in particular, SSE ops like 66 0F 3A 0C (blendps) must not alias with CMP
         // NOTE: opcode & 0b111 must keep op-encoded register
+        // NOTE: this is kinda sparse in the upper parts right now
         uint16_t opcode = 0;
 
         // currently ~660 mnemonics

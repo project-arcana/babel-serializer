@@ -25,8 +25,8 @@ namespace babel::x64
 {
 namespace
 {
-constexpr reg64 reg64_from_op(std::byte op, bool extended) { return reg64((uint8_t(op) & 0b111) + (extended ? 8 : 0)); }
-constexpr reg32 reg32_from_op(std::byte op) { return reg32((uint8_t(op) & 0b111)); }
+constexpr reg64 reg64_from_op(uint32_t op, bool extended) { return reg64((op & 0b111) + (extended ? 8 : 0)); }
+constexpr reg32 reg32_from_op(uint32_t op) { return reg32((op & 0b111)); }
 
 //
 // REX
@@ -109,7 +109,7 @@ struct x64_op_info_t
 };
 
 // first byte opcode
-static constexpr x64_op_info_t x64_op_info = []
+/*static constexpr x64_op_info_t x64_op_info = []
 {
     // TODO: generate me
     x64_op_info_t info;
@@ -225,7 +225,7 @@ static constexpr x64_op_info_t x64_op_info_0F = []
     info.set_op(0x8F, mnemonic::jg, arg_format::imm32);
 
     return info;
-}();
+}();*/
 
 // subop
 static constexpr x64_op_info_t x64_op_info_sub = []
@@ -450,56 +450,92 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     instr.data = data;
     auto op = *data++;
 
-    // has 0x66 prefix?
-    auto has_66_prefix = false;
-    if (op == std::byte(0x66))
+    // parse prefixes
+    auto pref_0F = false;  // two-byte opcodes
+    auto pref_66 = false;  // size prefix | op sel
+    auto pref_67 = false;  // addr size prefix
+    auto pref_F2 = false;  // rep
+    auto pref_F3 = false;  // rep
+    auto pref_F0 = false;  // lock
+
+    auto check_for_prefixes = true;
+    while (check_for_prefixes)
     {
+        switch (uint8_t(op))
+        {
+        case 0x0F:
+            pref_0F = true;
+            break;
+        case 0x66:
+            pref_66 = true;
+            break;
+        case 0x67:
+            pref_67 = true;
+            break;
+        case 0xF2:
+            pref_F2 = true;
+            break;
+        case 0xF3:
+            pref_F3 = true;
+            break;
+        case 0xF0:
+            pref_F0 = true;
+            break;
+
+        case 0x9B:
+            LOG_WARN("TODO: support x87 instruction for byte 0x%s (in %s)", op, cc::span<std::byte const>(instr.data, cc::min(instr.data + 16, end)));
+            return {};
+
+        default:
+            if (is_rex(op))
+            {
+                rex = op;
+            }
+            else
+            {
+                // no prefix anymore
+                check_for_prefixes = false;
+
+                // no next data
+                continue;
+            }
+        }
+
+        // next
         if (data >= end)
             return {};
 
         op = *data++;
-        instr.offset_op++;
-        has_66_prefix = true;
     }
+    instr.offset_op = data - instr.data;
 
-    // rex prefix
-    if (is_rex(op))
+    // first round of decode
+    // two tables can be directly addressed
+    //   one-byte ops from 0x000..0x0FF
+    //   two-byte ops from 0x100..0x1FF
     {
-        if (data >= end)
-            return {};
+        auto dec_idx = int(op);
+        if (pref_0F)
+            dec_idx += 0xFF;
 
-        rex = op;
-        op = *data++;
-        instr.offset_op++;
+        // 10 bit mnemonic
+        //  4 bit args
+        //  2 bit status
+        auto dec = detail::decode_table[dec_idx];
+        mnem = mnemonic(dec & 0b11'1111'1111);
+        args = arg_format((dec >> 10) & 0b1111);
     }
 
-    // TODO: single load for opinfo?
-    // TODO: merge opinfo tables
-
-    // is 0x0F opcode?
-    if (op == std::byte(0x0F))
-    {
-        if (data >= end)
-            return {};
-
-        op = *data++;
-        instr.offset_op++;
-        instr.op_group = 1;
-        mnem = x64_op_info_0F.mnemonic[int(op)];
-        args = x64_op_info_0F.args[int(op)];
-    }
-    else // only primary opcode
-    {
-        mnem = x64_op_info.mnemonic[int(op)];
-        args = x64_op_info.args[int(op)];
-    }
-
-    // look up primary op
+    // unknown op?
     if (mnem == mnemonic::_invalid)
     {
         LOG_WARN("unknown instruction for byte 0x%s (in %s)", op, cc::span<std::byte const>(instr.data, cc::min(instr.data + 16, end)));
         return {};
     }
+
+    // subresolve:
+    // - some op codes like 0x80 (add/or/...) have 8 "subcodes" in their ModR/M byte
+    // - those are marked as subresolve in the 1st phase lookup
 
     // ModR/M
     if (mnem == mnemonic::_subresolve || has_modrm(args))
@@ -583,6 +619,8 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
 
     case arg_format::imm8:
     case arg_format::modm_imm8:
+    case arg_format::modm_modr_imm8:
+    case arg_format::modr_modm_imm8:
         if (data >= end)
             return {};
         instr.offset_immediate = data - instr.data;
@@ -671,6 +709,24 @@ cc::string babel::x64::instruction::to_string() const
         add_modm_to_string(s, *this);
         s += ", ";
         add_imm32_to_string(s, *this);
+        break;
+
+        // 3 args
+    case arg_format::modm_modr_imm8:
+        s += ' '; // TODO: pad?
+        add_modm_to_string(s, *this);
+        s += ", ";
+        add_modr_to_string(s, *this);
+        s += ", ";
+        add_imm8_to_string(s, *this);
+        break;
+    case arg_format::modr_modm_imm8:
+        s += ' '; // TODO: pad?
+        add_modr_to_string(s, *this);
+        s += ", ";
+        add_modm_to_string(s, *this);
+        s += ", ";
+        add_imm8_to_string(s, *this);
         break;
     }
 
