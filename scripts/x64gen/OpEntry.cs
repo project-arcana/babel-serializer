@@ -8,10 +8,14 @@ class OpEntry
     public int phase1_idx => category == "one" ? primary_opcode : primary_opcode + 256;
     public int decode_idx = -1;
     public string mnemonic = "";
-    public string arg_format = "";
 
     public int computed_subidx = 0;
     public int phase2_offset = int.MaxValue;
+
+    public bool has_modrm = false;
+    public string? imm_fmt = null;
+    public bool has_extended_op = false;
+    public bool has_secondary_op = false;
 
     // code to identify how trailing bytes must be parsed
     public string trail_bin_format = "";

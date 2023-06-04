@@ -18,7 +18,7 @@ static int test_sum(cc::span<int const> vals)
         s += i;
     return s;
 }
-static int test_sum2(int* a, int *b)
+static int test_sum2(int* a, int* b)
 {
     auto s = 0;
     while (a != b)
@@ -47,6 +47,12 @@ TEST("x64 assembly basic decode")
         LOG("block: %s ...", cc::span(p_start, p_start + 30));
         auto p_end = p_start + 5000; // TODO: how to get a more reliable estimate? get readable pages?
 
+        auto enqueue = [&](std::byte const* root)
+        {
+            start_queue.push_back(root);
+            // LOG(" .. enqueue %s", root);
+        };
+
         while (true)
         {
             auto i = babel::x64::decode_one(p_start, p_end);
@@ -56,21 +62,13 @@ TEST("x64 assembly basic decode")
             LOG("%s %<33s %s", i.data, i.as_span(), i);
             p_start += i.size;
 
-            if (is_return(i)) // ret -> end
+            // control flow might change
+            if (is_jump_or_call(i))
+                enqueue(jump_or_call_target_of(i));
+
+            // stop once the basic block cannot continue
+            if (!has_fallthrough(i))
                 break;
-
-            if (is_unconditional_jump(i)) // jmp -> end
-            {
-                start_queue.push_back(unconditional_jump_target(i));
-                // or just continue block directly there?
-                break;
-            }
-
-            if (is_relative_call(i)) // call -> block continues
-                start_queue.push_back(relative_call_target(i));
-
-            if (is_conditional_jump(i)) // jzz -> block might continue
-                start_queue.push_back(conditional_jump_target(i));
         }
     };
 

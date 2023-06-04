@@ -302,142 +302,39 @@ void ProcessEntry(XElement entry, XElement syntax, string mnemonic)
     if (prefix == "66")
         computed_subidx += 8;
 
-    // no args
-    if (!has_op1 && !has_op2)
+    var has_rm = false;
+    string? imm_fmt = null;
+    if (is_extended)
+        has_rm = true;
+    if (isModR(op1) || isModM(op1))
+        has_rm = true;
+    foreach (var se in syn_parts)
+        if (isImmediate(AddrOfOp(se)))
+            imm_fmt = ImmTypeOf(AddrOfOp(se), TypeOfOp(se));
+
+    OpEntry MakeOp(int offset = 0) => new OpEntry
     {
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "none",
-            trail_bin_format = "0",
-        });
-    }
-    // opreg, like push/pop
-    else if ((isOpReg(op1) && !has_op2) || (isOpReg(op2) && !has_op1))
+        category = cat!,
+        mnemonic = mnemonic,
+        primary_opcode = pri_opcode + offset,
+        full_opcode = full_opcode + offset,
+        computed_subidx = computed_subidx,
+        has_extended_op = is_extended,
+        has_secondary_op = has_secondary_op,
+        has_modrm = has_rm,
+        imm_fmt = imm_fmt,
+        trail_bin_format = (has_rm ? "rm" : "") + (imm_fmt ?? "")
+    };
+
+    // TODO: format hints
+    if (isOpReg(op1))
     {
         for (var i = 0; i < 8; ++i)
-            AddEntry(new OpEntry
-            {
-                category = cat,
-                mnemonic = mnemonic,
-                primary_opcode = pri_opcode + i,
-                full_opcode = full_opcode + i,
-                computed_subidx = computed_subidx,
-                arg_format = op1_t == "vq" || op2_t == "vq" ? "opreg64" : "opreg",
-                trail_bin_format = "0",
-            });
-    }
-    // opreg + imm, like some mov
-    else if (isOpReg(op1) && isImmediate(op2))
-    {
-        for (var i = 0; i < 8; ++i)
-            AddEntry(new OpEntry
-            {
-                category = cat,
-                mnemonic = mnemonic,
-                primary_opcode = pri_opcode + i,
-                full_opcode = full_opcode + i,
-                computed_subidx = computed_subidx,
-                arg_format = "imm" + ImmTypeOf(op2, op2_t),
-                trail_bin_format = "i" + ImmTypeOf(op2, op2_t),
-            });
-    }
-    // only immediate
-    else if ((isImmediate(op1) && !has_op2) || (isImmediate(op2) && !has_op1))
-    {
-        var immtype = has_op1 ? ImmTypeOf(op1, op1_t) : ImmTypeOf(op2, op2_t);
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "imm" + immtype,
-            trail_bin_format = "i" + immtype,
-        });
-    }
-    // pure ModR/M
-    else if (isModR(op2) && isModM(op1))
-    {
-        if (has_op3 && !isImmediate(op3))
-        {
-            System.Console.WriteLine($"ERROR: TODO 3rd ARG assumed imm for {pri_opcd} {syn_parts[2]}");
-            return;
-        }
-
-        // if (src_t == "vqp" && dst_t == "vqp")
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "modr_modm" + (has_op3 ? "_imm" + ImmTypeOf(op3, op3_t) : ""),
-            trail_bin_format = "rm" + (has_op3 ? "i" + ImmTypeOf(op3, op3_t) : ""),
-        });
-        // TODO: type hints for printing
-    }
-    else if (isModM(op2) && isModR(op1))
-    {
-        if (has_op3 && !isImmediate(op3))
-        {
-            System.Console.WriteLine($"ERROR: TODO 3rd ARG assumed imm for {pri_opcd} {syn_parts[2]}");
-            return;
-        }
-
-        // if (src_t == "vqp" && dst_t == "vqp")
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "modm_modr" + (has_op3 ? "_imm" + ImmTypeOf(op3, op3_t) : ""),
-            trail_bin_format = "rm" + (has_op3 ? "i" + ImmTypeOf(op3, op3_t) : ""),
-        });
-        // TODO: type hints for printing
-    }
-    else if (op2 == "I" && isModM(op1))
-    {
-        if (has_op3)
-            throw new InvalidOperationException();
-
-        // if (src_t == "vds" && dst_t == "vqp")
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "modm_imm" + ImmTypeOf(op2, op2_t),
-            trail_bin_format = "rmi" + ImmTypeOf(op2, op2_t),
-        });
-        // TODO: type hints for printing
-    }
-    else if (!has_op2 && isModM(op1))
-    {
-        AddEntry(new OpEntry
-        {
-            category = cat,
-            mnemonic = mnemonic,
-            primary_opcode = pri_opcode,
-            full_opcode = full_opcode,
-            computed_subidx = computed_subidx,
-            arg_format = "modm",
-            trail_bin_format = "rm",
-        });
+            AddEntry(MakeOp(i));
     }
     else
     {
-        todos.Add($"decode entry for {cat} {pri_opcd} {mnemonic} | {op1}:{op1_t} {op2}:{op2_t} {op3}:{op3_t}");
+        AddEntry(MakeOp());
     }
 }
 foreach (var op in refdoc.Descendants("pri_opcd"))
@@ -468,6 +365,9 @@ foreach (var op in refdoc.Descendants("pri_opcd"))
             continue; // weird x87 stuff
         if (entry.Attribute("fpush") != null)
             continue; // weird x87 stuff
+
+        if (entry.Element("grp1")?.Value == "x87fpu")
+            continue; // just ignore x87 completely for now
 
         var is_extended = !string.IsNullOrEmpty(entry.Element("opcd_ext")?.Value);
 
@@ -562,6 +462,22 @@ for (var i = 0; i < 512; ++i)
             op_by_sub_idx.Add(sub_idx, e);
         }
 
+        var any_ext = es.Any(e => e.has_extended_op);
+        var any_not_ext = es.Any(e => !e.has_extended_op);
+        if (any_ext && any_not_ext)
+        {
+            System.Console.WriteLine("ERROR: clash with inconsistent is-ext!");
+            return;
+        }
+
+        var any_sec = es.Any(e => e.has_secondary_op);
+        var any_not_sec = es.Any(e => !e.has_secondary_op);
+        if (any_sec && any_not_sec)
+        {
+            System.Console.WriteLine("ERROR: clash with inconsistent is-sec!");
+            return;
+        }
+
         var minidx = op_by_sub_idx.Keys.Min();
         var maxidx = op_by_sub_idx.Keys.Max();
         System.Console.WriteLine($"  .. resolved by {maxidx - minidx + 1} slots, {minidx}..{maxidx} | used {op_by_sub_idx.Count}");
@@ -634,41 +550,43 @@ for (var i = 0; i < phase2_slots.Count; ++i)
 // generate file
 //
 
-var arg_fmts = new List<string>{
-    "none",
-    "opreg",
-    "opreg64",
-    "imm8",
-    "imm16",
-    "imm32",
-    "imm32_64",
-    "opreg_imm",
-    "modm", // must be first modrm
-    "modm_modr",
-    "modr_modm",
-    "modm_modr_imm8",
-    "modm_modr_imm32",
-    "modr_modm_imm8",
-    "modm_imm8",
-    "modm_imm32",
-    "modm_imm32_64",
-};
-
-ushort MakeTableEntry(string mnemonic, string arg_fmt)
+ushort MakeTableEntry(string mnemonic, bool has_rm, string? imm_fmt)
 {
     int mnem = 0; // invalid
     if (mnemonic == "_invalid")
         mnem = 0;
-    else if (mnemonic == "_phase2")
-        mnem = 1;
-    else mnem = 2 + mnemonics!.IndexOf(mnemonic);
+    else mnem = 1 + mnemonics!.IndexOf(mnemonic);
 
-    if (!arg_fmts.Contains(arg_fmt))
-        System.Console.WriteLine("ERROR: unknown fmt " + arg_fmt);
+    int imm_type = 0;
+    switch (imm_fmt)
+    {
+        case "":
+        case null: imm_type = 0; break;
+        case "8": imm_type = 1; break;
+        case "16": imm_type = 2; break;
+        case "32": imm_type = 3; break;
+        case "32_64": imm_type = 4; break;
+        default:
+            System.Console.WriteLine("ERROR: unknown fmt " + imm_fmt);
+            throw new InvalidOperationException();
+    }
 
-    int arg = arg_fmts!.IndexOf(arg_fmt);
+    return (ushort)(mnem + ((has_rm ? 1 : 0) << 10) + (imm_type << 11));
+}
+ushort MakeTableEntryPhase2(bool is_extended, bool has_secondary, int offset)
+{
+    int code = 0;
+    offset += 136;
+    if (offset < 0 || offset >= 1024)
+        throw new InvalidOperationException("offset out of range");
+    code += offset;
+    if (is_extended)
+        code += 1 << 10; // treat as ModR/M
+    if (has_secondary)
+        code += 1 << 11;
 
-    return (ushort)(mnem + (arg << 10));
+    code += 1 << 15; // mark as phase2
+    return (ushort)(code);
 }
 
 var table = new List<ushort>();
@@ -678,20 +596,32 @@ for (var i = 0; i < 256 * 2; ++i)
     ushort tentry = 0;
     if (!phase1_to_ops.ContainsKey(i))
     {
-        tentry = MakeTableEntry("_invalid", "none");
+        tentry = MakeTableEntry("_invalid", false, null);
     }
     else
     {
         var es = phase1_to_ops[i];
+        var e = es[0];
 
         if (es.Count > 1)
         {
-            tentry = MakeTableEntry("_phase2", "none");
+            if (es.Any(ee => ee.phase2_offset != e.phase2_offset))
+                throw new InvalidOperationException("phase2 offset must be unique");
+            if (es.Any(ee => ee.has_secondary_op != e.has_secondary_op))
+                throw new InvalidOperationException("has_secondary_op must be unique");
+
+            // ensure that phase2_ext implies modrm
+            tentry = MakeTableEntryPhase2(e.has_extended_op, e.has_secondary_op, e.phase2_offset);
+
+            foreach (var ce in es)
+            {
+                // TODO: check that idx in phase2 part is correct
+                var idx2 
+            }
         }
         else
         {
-            var e = es[0];
-            tentry = MakeTableEntry(e.mnemonic, e.arg_format);
+            tentry = MakeTableEntry(e.mnemonic, e.has_modrm, e.imm_fmt);
         }
     }
     table.Add(tentry);
@@ -702,19 +632,21 @@ for (var i = 0; i < phase2_slots.Count; ++i)
     ushort tentry = 0;
     var e = phase2_slots[i];
     if (e == null)
-        tentry = MakeTableEntry("_invalid", "none");
+        tentry = MakeTableEntry("_invalid", false, null);
     else
-        tentry = MakeTableEntry(e.mnemonic, e.arg_format);
+        tentry = MakeTableEntry(e.mnemonic, e.has_modrm, e.imm_fmt);
     table.Add(tentry);
 }
 
 var table_str = "";
 for (var i = 0; i < table.Count; ++i)
 {
+    if (i % 16 == 0)
+        table_str += "    ";
     table_str += table[i];
-    table_str += ",";
+    table_str += ", ";
     if (i % 16 == 15)
-        table_str += "\n";
+        table_str += " //\n";
 }
 
 var hh = @$"#pragma once
@@ -728,23 +660,21 @@ namespace babel::x64
 enum class mnemonic : uint16_t 
 {{
     _invalid,
-    _phase2,
 
     {string.Join(",\n    ", mnemonics.Select(s => SafeMnemonic(s)))}
 }};
 char const* to_string(mnemonic m);
 
-// TODO: decode instruction such that arguments are fixed size
-enum class arg_format : uint8_t
-{{
-    {string.Join(",\n    ", arg_fmts)}
-}};
-static_assert(int(arg_format::{arg_fmts.Last()}) <= 0b11111);
-static constexpr bool has_modrm(arg_format f) {{ return f >= arg_format::modm; }}
-
 namespace detail
 {{
 extern uint16_t const decode_table[{table.Count}];
+
+static constexpr mnemonic entry_mnemonic(uint16_t entry) {{ return mnemonic(entry & 0b11'1111'1111); }}
+static constexpr bool entry_has_modrm(uint16_t entry) {{ return (entry & (1 << 10)) != 0; }}
+static constexpr bool entry_phase2_add_secondary(uint16_t entry) {{ return (entry & (1 << 11)) != 0; }}
+static constexpr bool entry_is_phase2(uint16_t entry) {{ return (entry & (1 << 15)) != 0; }}
+static constexpr uint8_t entry_get_immsize(uint16_t entry) {{ return entry >> 11; }}
+static constexpr int entry_phase2_get_offset(mnemonic m) {{ return int(m) - 136; }}
 }}
 
 }} // babel::x64
@@ -757,7 +687,6 @@ var cc = @$"// CAUTION: this file is auto-generated. DO NOT MODIFY!
 
 static char const* s_mnemonic_names[] = {{
     ""<invalid-mnemonic>"",
-    ""<unresolved-mnemonic>"",
     {string.Join("\n    ", mnemonics.Select(s => $@"""{s}"","))}
 }};
 

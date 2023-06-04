@@ -9,7 +9,6 @@ namespace babel::x64
 enum class mnemonic : uint16_t
 {
     _invalid,
-    _phase2,
 
     adc,
     add,
@@ -97,49 +96,11 @@ enum class mnemonic : uint16_t
     divss,
     dppd,
     dpps,
-    emms,
     enter,
     extractps,
-    f2xm1,
-    fabs,
-    fchs,
-    fclex,
-    fcom,
-    fcomi,
-    fcos,
-    fdecstp,
-    fdisi,
-    feni,
-    fincstp,
-    finit,
-    fldcw,
-    fldenv,
-    fnclex,
     fndisi,
     fneni,
-    fninit,
-    fnop,
-    fnsave,
     fnsetpm,
-    fnstcw,
-    fnstenv,
-    fnstsw,
-    fprem,
-    fprem1,
-    frndint,
-    fsave,
-    fscale,
-    fsetpm,
-    fsin,
-    fsqrt,
-    fstcw,
-    fstenv,
-    fstsw,
-    ftst,
-    fucom,
-    fwait,
-    fxam,
-    fxch,
     fxrstor,
     fxsave,
     getsec,
@@ -407,32 +368,16 @@ enum class mnemonic : uint16_t
 };
 char const* to_string(mnemonic m);
 
-enum class arg_format : uint8_t
-{
-    none,
-    opreg,
-    opreg64,
-    imm8,
-    imm16,
-    imm32,
-    imm32_64,
-    opreg_imm,
-    modm,
-    modm_modr,
-    modr_modm,
-    modm_modr_imm8,
-    modm_modr_imm32,
-    modr_modm_imm8,
-    modm_imm8,
-    modm_imm32,
-    modm_imm32_64
-};
-static_assert(int(arg_format::modm_imm32_64) <= 0b11111);
-static constexpr bool has_modrm(arg_format f) { return f >= arg_format::modm; }
-
 namespace detail
 {
-extern uint16_t const decode_table[793];
+extern uint16_t const decode_table[789];
+
+static constexpr mnemonic entry_mnemonic(uint16_t entry) { return mnemonic(entry & 0b11'1111'1111); }
+static constexpr bool entry_has_modrm(uint16_t entry) { return (entry & (1 << 10)) != 0; }
+static constexpr bool entry_phase2_add_secondary(uint16_t entry) { return (entry & (1 << 11)) != 0; }
+static constexpr bool entry_is_phase2(uint16_t entry) { return (entry & (1 << 15)) != 0; }
+static constexpr uint8_t entry_get_immsize(uint16_t entry) { return entry >> 11; }
+static constexpr int entry_phase2_get_offset(mnemonic m) { return int(m) + (512 - 136); }
 }
 
 } // babel::x64

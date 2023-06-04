@@ -154,9 +154,6 @@ struct instruction
         // 1-15 bytes for x64
         uint8_t size : 4 = 0;
 
-        // packed version of arg_format
-        uint8_t args_packed : 5 = 0;
-
         // lower 4 bits of rex
         uint8_t rex : 4 = 0;
 
@@ -175,14 +172,13 @@ struct instruction
         uint8_t size_immediate : 2 = 0;
         uint8_t size_displacement : 2 = 0;
 
-        // .. we are currently at exactly 64 bits
+        uint8_t is_lock : 1 = 0;
     };
 
     // convenience unpacking
     // NOTE: no mem access, just some casting
 public:
     x64::mnemonic mnemonic() const { return x64::mnemonic(mnemonic_packed); }
-    x64::arg_format arg_format() const { return x64::arg_format(args_packed); }
 
     // properties
 public:
@@ -202,11 +198,29 @@ instruction decode_one(std::byte const* data, std::byte const* end);
 // properties
 //
 
+inline int64_t int64_immediate_of(instruction const& i)
+{
+    CC_ASSERT(i.offset_immediate > 0 && "instruction has no immediate");
+    CC_ASSERT(i.size_immediate == 3 && "instruction immediate has wrong size");
+    return *(int64_t const*)(i.data + i.offset_immediate);
+}
 inline int32_t int32_immediate_of(instruction const& i)
 {
     CC_ASSERT(i.offset_immediate > 0 && "instruction has no immediate");
     CC_ASSERT(i.size_immediate == 2 && "instruction immediate has wrong size");
     return *(int32_t const*)(i.data + i.offset_immediate);
+}
+inline int16_t int16_immediate_of(instruction const& i)
+{
+    CC_ASSERT(i.offset_immediate > 0 && "instruction has no immediate");
+    CC_ASSERT(i.size_immediate == 1 && "instruction immediate has wrong size");
+    return *(int16_t const*)(i.data + i.offset_immediate);
+}
+inline int8_t int8_immediate_of(instruction const& i)
+{
+    CC_ASSERT(i.offset_immediate > 0 && "instruction has no immediate");
+    CC_ASSERT(i.size_immediate == 0 && "instruction immediate has wrong size");
+    return *(int8_t const*)(i.data + i.offset_immediate);
 }
 
 inline bool is_conditional_jump(instruction const& i)
@@ -214,14 +228,14 @@ inline bool is_conditional_jump(instruction const& i)
     return (i.opcode >= 0x70 && i.opcode <= 0x7F) || //
            (i.opcode >= 0x0F80 && i.opcode <= 0x0F8F);
 }
-inline std::byte const* conditional_jump_target(instruction const& i)
+inline std::byte const* conditional_jump_target_of(instruction const& i)
 {
     CC_ASSERT(is_conditional_jump(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
 inline bool is_unconditional_jump(instruction const& i) { return i.mnemonic() == mnemonic::jmp; }
-inline std::byte const* unconditional_jump_target(instruction const& i)
+inline std::byte const* unconditional_jump_target_of(instruction const& i)
 {
     CC_ASSERT(is_unconditional_jump(i));
     return i.data + i.size + int32_immediate_of(i);
@@ -229,12 +243,54 @@ inline std::byte const* unconditional_jump_target(instruction const& i)
 
 // TODO: others?
 inline bool is_relative_call(instruction const& i) { return i.opcode == 0xE8; }
-inline std::byte const* relative_call_target(instruction const& i)
+inline std::byte const* relative_call_target_of(instruction const& i)
 {
     CC_ASSERT(is_relative_call(i));
     return i.data + i.size + int32_immediate_of(i);
 }
 
+inline bool is_jump_or_call(instruction const& i)
+{
+    return is_relative_call(i) || is_conditional_jump(i) || is_unconditional_jump(i) || is_relative_call(i);
+}
+inline std::byte const* jump_or_call_target_of(instruction const& i)
+{
+    CC_ASSERT(is_jump_or_call(i));
+    switch (i.size_immediate)
+    {
+    case 0:
+        return i.data + i.size + int8_immediate_of(i);
+    case 1:
+        return i.data + i.size + int16_immediate_of(i);
+    case 2:
+        return i.data + i.size + int32_immediate_of(i);
+    case 3:
+        return i.data + i.size + int64_immediate_of(i);
+    }
+    CC_UNREACHABLE();
+}
+
 inline bool is_return(instruction const& i) { return i.mnemonic() == mnemonic::retn; }
+
+// is there a path to continue?
+inline bool has_fallthrough(instruction const& i) { return !is_return(i) && !is_unconditional_jump(i); }
+
+
+// TODO: instruction predicates
+// - has fallthrough
+// - is call-or-branch
+// - is indirect call
+// - is indirect jump
+// - is memory write
+// - is memory read
+
+// TODO: function / block predicates
+// - is branchless
+// - is call-less
+// - has memory access
+// - has loops (aka cycles in BB graph)
+// - estimate cycle count
+//   -> min/max for branches-but-acyclic
+//   -> simple offset + number * body-cost for loops
 
 } // namespace babel::x64
