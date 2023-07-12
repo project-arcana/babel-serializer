@@ -149,30 +149,30 @@ struct instruction
 
         // currently ~660 mnemonics
         // stored directly because it's accessed frequently
-        uint16_t mnemonic_packed : 10 = 0;
+        uint16_t mnemonic_packed : 10;
 
         // 1-15 bytes for x64
-        uint8_t size : 4 = 0;
+        uint8_t size : 4;
 
         // lower 4 bits of rex
-        uint8_t rex : 4 = 0;
+        uint8_t rex : 4;
 
         // is always valid, including 0
-        uint8_t offset_op : 3 = 0;
+        uint8_t offset_op : 3;
         // 0 means "no ModR/M byte"
-        uint8_t offset_modrm : 3 = 0;
+        uint8_t offset_modrm : 3;
         // SIB is always ModR/M + 1
 
         // 0 means "no displacement"
-        uint8_t offset_displacement : 4 = 0;
+        uint8_t offset_displacement : 4;
 
         // 0 means "no immediate"
-        uint8_t offset_immediate : 4 = 0;
+        uint8_t offset_immediate : 4;
         // size = 8/16/32/64
-        uint8_t size_immediate : 2 = 0;
-        uint8_t size_displacement : 2 = 0;
+        uint8_t size_immediate : 2;
+        uint8_t size_displacement : 2;
 
-        uint8_t is_lock : 1 = 0;
+        uint8_t is_lock : 1;
     };
 
     // convenience unpacking
