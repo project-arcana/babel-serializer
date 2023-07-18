@@ -37,7 +37,7 @@ struct csv_ref
     };
 
     cc::vector<entry> entries;
-    cc::optional<cc::vector<cc::string>> header;
+    cc::vector<cc::string> header; // is empty if no header present
     size_t column_count = 0;
 
     size_t row_count() const { return entries.size() / column_count; }
@@ -50,10 +50,10 @@ struct csv_ref
 
     cc::strided_span<entry const> column(cc::string_view name) const
     {
-        CC_ASSERT(header.has_value() && "a header must be present to access columns this way");
-        for (size_t i = 0; i < header.value().size(); ++i)
+        CC_ASSERT(!header.empty() && "a header must be present to access columns this way");
+        for (size_t i = 0; i < header.size(); ++i)
         {
-            if (header.value()[i] == name)
+            if (header[i] == name)
                 return column(i);
         }
         CC_UNREACHABLE("column name does not exist");
@@ -71,4 +71,4 @@ struct csv_ref
 };
 
 csv_ref read(cc::string_view csv_string, read_config const& config = {}, error_handler on_error = default_error_handler);
-}
+} // namespace babel::csv
