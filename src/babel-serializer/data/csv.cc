@@ -64,7 +64,7 @@ babel::csv::csv_ref babel::csv::read(cc::string_view csv_string, read_config con
             if (name.empty())
                 on_error(cc::as_byte_span(csv_string), cc::as_byte_span(name), "header has empty token", severity::warning);
 
-            csv.header.value().push_back(name);
+            csv.header.push_back(name);
 
             if (p != end && *p == config.separator) // no data lines, just a header
                 ++p;
@@ -73,7 +73,7 @@ babel::csv::csv_ref babel::csv::read(cc::string_view csv_string, read_config con
         if (p != end)
             ++p;
 
-        csv.column_count = csv.header.value().size();
+        csv.column_count = csv.header.size();
     }
 
 
