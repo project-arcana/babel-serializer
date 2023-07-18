@@ -17,6 +17,9 @@ namespace babel::file
 /// returns true if the file exists and can be read
 bool exists(cc::string_view filename);
 
+/// returns size of an existing file
+size_t size_of(cc::string_view filename);
+
 /// reads a file and writes all bytes in the provided stream (buffered)
 void read(cc::stream_ref<std::byte> out, cc::string_view filename, error_handler on_error = default_error_handler);
 

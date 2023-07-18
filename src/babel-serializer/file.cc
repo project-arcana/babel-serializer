@@ -1,5 +1,6 @@
 #include "file.hh"
 
+#include <filesystem>
 #include <fstream>
 
 #if defined(CC_OS_WINDOWS)
@@ -290,3 +291,5 @@ babel::file::memory_mapped_file<std::byte const> babel::file::make_memory_mapped
 {
     return memory_mapped_file<std::byte const>(path);
 }
+
+size_t babel::file::size_of(cc::string_view filename) { return std::filesystem::file_size(cc::string(filename).c_str()); }
