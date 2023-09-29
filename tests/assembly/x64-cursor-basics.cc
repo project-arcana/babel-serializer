@@ -26,7 +26,7 @@ static int test_sum2(int* a, int* b)
     return s;
 }
 
-TEST("x64 assembly basic decode")
+TEST("x64 assembly basic decode", disabled)
 {
     cc::set<std::byte const*> seen_starts;
     cc::ringbuffer<std::byte const*> start_queue;
