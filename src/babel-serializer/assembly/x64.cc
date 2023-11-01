@@ -86,7 +86,7 @@ uint8_t sib_base_of(std::byte b, uint8_t rex) { return (uint8_t(b) & 0b111) + (i
 // Formatting
 //
 
-void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     if (is_rex_w(in.rex))
     {
@@ -98,7 +98,7 @@ void add_opreg_to_string(cc::string& s, babel::x64::instruction const& in)
         s += x64::to_string(reg32_from_op(in.opcode));
 }
 
-void add_opreg64_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_opreg64_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     if (is_rex_w(in.rex))
     {
@@ -110,7 +110,7 @@ void add_opreg64_to_string(cc::string& s, babel::x64::instruction const& in)
         s += x64::to_string(reg64_from_op(in.opcode, false));
 }
 
-void add_modr_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_modr_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     auto const modrm = in.data[in.offset_modrm];
     // auto const mode = modrm_mode_of(modrm);
@@ -132,7 +132,7 @@ void add_modr_to_string(cc::string& s, babel::x64::instruction const& in)
     }
 }
 
-void add_disp8_to_string(cc::string& s, std::byte d)
+[[maybe_unused]] void add_disp8_to_string(cc::string& s, std::byte d)
 {
     auto v = int8_t(d);
     if (v >= 0)
@@ -147,7 +147,7 @@ void add_disp8_to_string(cc::string& s, std::byte d)
     }
 }
 
-void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     auto const modrm = in.data[in.offset_modrm];
     auto const mode = modrm_mode_of(modrm);
@@ -234,14 +234,14 @@ void add_modm_to_string(cc::string& s, babel::x64::instruction const& in)
         s += ']';
 }
 
-void add_imm8_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_imm8_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     CC_ASSERT(in.offset_immediate > 0 && "no immediate available");
     s += "0x";
     s += cc::to_string(in.data[in.offset_immediate]);
 }
 
-void add_imm16_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_imm16_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     CC_ASSERT(in.offset_immediate > 0 && "no immediate available");
     s += "0x";
@@ -249,7 +249,7 @@ void add_imm16_to_string(cc::string& s, babel::x64::instruction const& in)
         s += cc::to_string(in.data[in.offset_immediate + i]);
 }
 
-void add_imm32_to_string(cc::string& s, babel::x64::instruction const& in)
+[[maybe_unused]] void add_imm32_to_string(cc::string& s, babel::x64::instruction const& in)
 {
     CC_ASSERT(in.offset_immediate > 0 && "no immediate available");
     s += "0x";
@@ -276,7 +276,7 @@ babel::x64::instruction babel::x64::decode_one(std::byte const* data, std::byte 
     // parse prefixes
     auto pref_0F = false; // two-byte opcodes
     auto pref_66 = false; // size prefix | op sel
-    auto pref_67 = false; // addr size prefix
+    [[maybe_unused]] auto pref_67 = false; // addr size prefix
     auto pref_F2 = false; // rep
     auto pref_F3 = false; // rep
     auto pref_F0 = false; // lock
