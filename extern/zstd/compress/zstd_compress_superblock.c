@@ -416,6 +416,7 @@ static size_t ZSTD_seqDecompressedSize(seqStore_t const* seqStore, const seqDef*
         matchLengthSum += seqLen.matchLength;
         sp++;
     }
+    (void)litLengthSum;
     assert(litLengthSum <= litSize);
     if (!lastSequence) {
         assert(litLengthSum == litSize);
