@@ -219,6 +219,8 @@ private:
             auto& n = json.nodes[node_idx];
             n.token = {s, curr};
             n.child_count = child_cnt;
+            if (child_cnt == 0)
+                n.first_child = 0;
         }
         else if (c == '{')
         {
@@ -418,8 +420,8 @@ private:
         return node_idx;
     }
 };
-}
-}
+} // namespace
+} // namespace babel::json
 
 babel::json::json_ref babel::json::read_ref(cc::string_view json, read_config const&, error_handler on_error)
 {
@@ -547,7 +549,7 @@ void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n
     else
         v = n.get_double();
 }
-void babel::json::detail::json_deserializer::deserialize(const json_ref::node& n, cc::string& v)
+void babel::json::detail::json_deserializer::deserialize(json_ref::node const& n, cc::string& v)
 {
     // TODO: performance can be increased by reusing storage of v
 
