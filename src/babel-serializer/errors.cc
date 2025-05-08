@@ -178,15 +178,30 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
     // text mode
     else
     {
-        auto ls = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.front()));
-        auto le = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.back()));
+        // ls is the line where the highlighted position starts
+        // le is the line where the highlighted position ends
+        auto const ls = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.front()));
+        auto const le = pos.empty() ? 0 : map.line_of(reinterpret_cast<char const*>(&pos.back()));
 
-        auto padding = 2;
-        auto lls = cc::max(0, ls - padding);
-        auto lle = cc::min(int(map.lines().size()) - 1, le + padding);
+        // we want to show "padding" many lines before and after the end
+        auto const padding = 2;
+        // the "real" start/end is thus lls/lle
+        // which are clamped to the available number of lines
+        // they are guaranteed <= and >= ls/le, but not necessarily by +- padding
+        auto const lls = cc::max(0, ls - padding);
+        auto const lle = cc::min(int(map.lines().size()) - 1, le + padding);
 
-        auto skip_l = ls + 5;
-        auto skip_cnt = le - ls - 12;
+        // we don't want to show too many lines at once (imagine showing 1000 lines)
+        // thus, if we show more than "max_real_lines" of the highlighted content
+        // we want to skip ahead to the last "tail_real_lines" of the highlighted content
+        auto const max_real_lines = 4;
+        auto const tail_real_lines = 4; // symmetrix looks a bit better
+        // skip_l is the last real line of the head that we want to show
+        auto const skip_l = ls + max_real_lines - 1;
+        // skip_target_l is the line we want to jump to
+        auto const skip_target_l = le - tail_real_lines + 1;
+        // skip_cnt is the number of lines that are not shown
+        auto const skip_cnt = skip_target_l - skip_l;
 
         auto max_line_s = cc::to_string(map.lines().size());
         auto line_ellipsis = cc::string("...");
@@ -254,17 +269,17 @@ void babel::default_error_handler(cc::span<const std::byte> data, cc::span<const
                 if (l < lls)
                     print_line(l);
             if (lls > border_lines)
-                cc::format_to(log_message, "  {}", line_ellipsis);
+                cc::format_to(log_message, "  {}\n", line_ellipsis);
 
             for (auto l = lls; l <= lle; ++l)
             {
                 print_line(l);
-                if (l == skip_l)
+                if (skip_cnt > 3 && l == skip_l) // skip if we reach skip_l (and have a real skip)
                 {
                     cc::format_to(log_message, "  {}\n", line_ellipsis);
                     cc::format_to(log_message, "  {} skipping {} lines\n", line_ellipsis, skip_cnt);
                     cc::format_to(log_message, "  {}\n", line_ellipsis);
-                    l += skip_cnt;
+                    l += skip_cnt - 1;
                 }
             }
 
