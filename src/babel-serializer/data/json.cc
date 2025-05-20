@@ -12,16 +12,6 @@ cc::string babel::json::json_ref::node::get_string() const
     return babel::unescape_json_string(token);
 }
 
-int32_t babel::json::json_ref::node::get_int() const
-{
-    CC_ASSERT(is_number());
-
-    int32_t v;
-    auto ok = cc::from_string(token, v);
-    CC_ASSERT(ok); // TODO: proper error handling
-    return v;
-}
-
 float babel::json::json_ref::node::get_float() const
 {
     CC_ASSERT(is_number());
@@ -42,12 +32,34 @@ double babel::json::json_ref::node::get_double() const
     return v;
 }
 
+int32_t babel::json::json_ref::node::get_int() const
+{
+    CC_ASSERT(is_number());
+
+    int32_t v;
+    auto ok = cc::from_string(token, v);
+    if (!ok) // allow scientific notation in json
+    {
+        double d;
+        ok = cc::from_string(token, d);
+        v = int(d);
+    }
+    CC_ASSERT(ok); // TODO: proper error handling
+    return v;
+}
+
 int64_t babel::json::json_ref::node::get_int64() const
 {
     CC_ASSERT(is_number());
 
     int64_t v;
     auto ok = cc::from_string(token, v);
+    if (!ok) // allow scientific notation in json
+    {
+        double d;
+        ok = cc::from_string(token, d);
+        v = int64_t(d);
+    }
     CC_ASSERT(ok); // TODO: proper error handling
     return v;
 }
@@ -58,6 +70,12 @@ uint64_t babel::json::json_ref::node::get_uint64() const
 
     uint64_t v;
     auto ok = cc::from_string(token, v);
+    if (!ok) // allow scientific notation in json
+    {
+        double d;
+        ok = cc::from_string(token, d);
+        v = uint64_t(d);
+    }
     CC_ASSERT(ok); // TODO: proper error handling
     return v;
 }
