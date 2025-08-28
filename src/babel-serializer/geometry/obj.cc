@@ -1,3 +1,5 @@
+#include "obj.hh"
+
 #include <cstdio>
 #include <type_traits> // std::is_same_v
 
@@ -5,7 +7,7 @@
 #include <clean-core/from_string.hh>
 #include <clean-core/stream_ref.hh>
 
-#include "obj.hh"
+#include <babel-serializer/detail/line-helper.hh>
 
 /*
  * TODO:
@@ -343,58 +345,61 @@ babel::obj::geometry<ScalarT> read_impl(cc::span<const std::byte> data, babel::o
     };
 
     auto const data_as_string_view = cc::string_view(reinterpret_cast<char const*>(data.data()), reinterpret_cast<char const*>(data.data() + data.size()));
-    for (auto line : data_as_string_view.split('\n', cc::split_options::skip_empty))
-    {
-        line = *line.split('#').begin(); // remove comments
-        line = line.trim();
 
-        if (line.empty() || line.starts_with('#'))
-            continue;
-
-        if (line[0] == 'v')
+    detail::process_non_empty_lines_ex(
+        data_as_string_view,
+        [&](cc::string_view line)
         {
-            if (line.size() < 2)
+            line = *line.split('#').begin(); // remove comments
+            line = line.trim();
+
+            if (line.empty() || line.starts_with('#'))
+                return;
+
+            if (line[0] == 'v')
             {
-                on_error(data, cc::as_byte_span(line), "unable to parse line: starts with v but does not contain any vertex information", severity::error);
-                continue;
-            }
-            if (cc::is_blank(line[1]))
-                parse_vertex(line);
-            else
-            {
-                if (line.size() < 3)
+                if (line.size() < 2)
                 {
                     on_error(data, cc::as_byte_span(line), "unable to parse line: starts with v but does not contain any vertex information", severity::error);
-                    continue;
+                    return;
                 }
-                if (line[1] == 't' && cc::is_blank(line[2]))
-                    parse_texture_vertex(line);
-                else if (line[1] == 'n' && cc::is_blank(line[2]))
-                    parse_vertex_normal(line);
-                else if (line[1] == 'p' && cc::is_blank(line[2]))
-                    parse_parameter_space_vertex(line);
-                else if (cfg.add_unrecognized_lines)
-                    geometry.unrecognized_lines.push_back(line);
+                if (cc::is_blank(line[1]))
+                    parse_vertex(line);
+                else
+                {
+                    if (line.size() < 3)
+                    {
+                        on_error(data, cc::as_byte_span(line), "unable to parse line: starts with v but does not contain any vertex information", severity::error);
+                        return;
+                    }
+                    if (line[1] == 't' && cc::is_blank(line[2]))
+                        parse_texture_vertex(line);
+                    else if (line[1] == 'n' && cc::is_blank(line[2]))
+                        parse_vertex_normal(line);
+                    else if (line[1] == 'p' && cc::is_blank(line[2]))
+                        parse_parameter_space_vertex(line);
+                    else if (cfg.add_unrecognized_lines)
+                        geometry.unrecognized_lines.push_back(line);
+                }
             }
-        }
-        else if (line[0] == 'f' && line.size() >= 2 && cc::is_blank(line[1]))
-            parse_face(line);
-        else if (line[0] == 'p' && line.size() >= 2 && cc::is_blank(line[1]))
-            parse_point(line);
-        else if (line[0] == 'l' && line.size() >= 2 && cc::is_blank(line[1]))
-            parse_line(line);
-        else if (line[0] == 'g' && line.size() >= 2 && cc::is_blank(line[1]) && cfg.parse_groups)
-            parse_groups(line);
-        else if (cfg.add_unrecognized_lines)
-            geometry.unrecognized_lines.push_back(line);
-    }
+            else if (line[0] == 'f' && line.size() >= 2 && cc::is_blank(line[1]))
+                parse_face(line);
+            else if (line[0] == 'p' && line.size() >= 2 && cc::is_blank(line[1]))
+                parse_point(line);
+            else if (line[0] == 'l' && line.size() >= 2 && cc::is_blank(line[1]))
+                parse_line(line);
+            else if (line[0] == 'g' && line.size() >= 2 && cc::is_blank(line[1]) && cfg.parse_groups)
+                parse_groups(line);
+            else if (cfg.add_unrecognized_lines)
+                geometry.unrecognized_lines.push_back(line);
+        });
 
     if (cfg.parse_groups)
         handle_previous_groups(); // the last active groups
 
     return geometry;
 }
-}
+} // namespace
 
 babel::obj::geometry<float> babel::obj::read(cc::span<const std::byte> data, babel::obj::read_config const& cfg, babel::error_handler on_error)
 {

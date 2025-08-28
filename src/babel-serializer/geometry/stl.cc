@@ -7,6 +7,8 @@
 
 #include <clean-core/from_string.hh>
 
+#include <babel-serializer/detail/line-helper.hh>
+
 babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl::read_config const& cfg, babel::error_handler on_error)
 {
     using namespace babel;
@@ -15,7 +17,8 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
 
     auto const data_as_string_view = cc::string_view(reinterpret_cast<char const*>(data.data()), reinterpret_cast<char const*>(data.end()));
 
-    auto const is_ascii = [&]() {
+    auto const is_ascii = [&]()
+    {
         if (data.size() < 6)
         {
             on_error(data, data, "STL-file too short to be valid", severity::error);
@@ -43,9 +46,11 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             file_type = babel::stl::file_type::binary;
     }
 
-    auto const parse_binary = [&]() {
+    auto const parse_binary = [&]()
+    {
         size_t pos = 0;
-        auto const get_next = [&](size_t count) -> cc::span<const std::byte> {
+        auto const get_next = [&](size_t count) -> cc::span<const std::byte>
+        {
             auto const last_pos = pos;
             if (pos + count > data.size())
                 on_error(data, data.first(last_pos), "Failed to parse binary stl-file: unexpected eof", severity::error);
@@ -74,21 +79,24 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             }
         }
 
-        auto const parse_uint32 = [&]() {
+        auto const parse_uint32 = [&]()
+        {
             uint32_t ui;
             auto const s = get_next(sizeof(uint32_t));
             std::memcpy(&ui, s.data(), sizeof(ui));
             return ui;
         };
 
-        auto const parse_uint16 = [&]() {
+        auto const parse_uint16 = [&]()
+        {
             uint16_t ui;
             auto const s = get_next(sizeof(uint16_t));
             std::memcpy(&ui, s.data(), sizeof(ui));
             return ui;
         };
 
-        auto const parse_float = [&]() {
+        auto const parse_float = [&]()
+        {
             float f;
             auto const s = get_next(sizeof(float));
             std::memcpy(&f, s.data(), sizeof(f));
@@ -152,14 +160,17 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
         }
     };
 
-    auto const parse_ascii = [&]() {
+    auto const parse_ascii = [&]()
+    {
         tg::vec3 normal;
         tg::pos3 vertices[3];
         int current_vertex_idx = 0;
 
-        auto const is_space = [](char c) { return cc::is_space(c) || (static_cast<unsigned char>(c) >= static_cast<unsigned char>(128)); }; // treat non-ascii chars as space
+        auto const is_space = [](char c)
+        { return cc::is_space(c) || (static_cast<unsigned char>(c) >= static_cast<unsigned char>(128)); }; // treat non-ascii chars as space
 
-        auto const from_string = [&](cc::string_view s, float& f) {
+        auto const from_string = [&](cc::string_view s, float& f)
+        {
             if (cc::from_string(s, f))
                 return true;
             double d_value;
@@ -189,11 +200,11 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                 return false;
         };
 
-        for (auto line : data_as_string_view.split('\n', cc::split_options::skip_empty))
+        auto const process_line = [&](cc::string_view line)
         {
             line = line.trim(is_space);
             if (line.empty())
-                continue;
+                return;
 
             if (line.starts_with("solid"))
             {
@@ -210,13 +221,13 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                     if (!from_string(normal_entry, normal[i++]))
                     {
                         on_error(data, cc::as_byte_span(normal_entry), "Failed to parse STL: Failed to read normal", severity::error);
-                        continue;
+                        return;
                     }
                 }
             }
             else if (line.starts_with("outer loop"))
             {
-                continue;
+                return;
             }
             else if (line.starts_with("vertex"))
             {
@@ -227,14 +238,14 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
                     if (!from_string(vertex_entry, vertices[current_vertex_idx][i++]))
                     {
                         on_error(data, cc::as_byte_span(vertex_entry), "Failed to parse STL: Failed to read vertex", severity::error);
-                        continue;
+                        return;
                     }
                 }
                 current_vertex_idx++;
             }
             else if (line.starts_with("endloop"))
             {
-                continue;
+                return;
             }
             else if (line.starts_with("endfacet"))
             {
@@ -247,14 +258,16 @@ babel::stl::geometry babel::stl::read(cc::span<const std::byte> data, babel::stl
             else if (line.starts_with("endsolid"))
             {
                 // TODO: error handling, if anything comes after "endsolid <name>"
-                continue;
+                return;
             }
             else
             {
                 on_error(data, cc::as_byte_span(line), "Failed to parse STL-file: unknown line", severity::error);
-                continue;
+                return;
             }
-        }
+        };
+
+        detail::process_non_empty_lines_ex(data_as_string_view, process_line);
     };
 
     switch (file_type)
