@@ -28,6 +28,8 @@
 #include <clean-core/string.hh>
 #include <clean-core/temp_cstr.hh>
 
+#include <rich-log/log.hh>
+
 void babel::file::read(cc::stream_ref<std::byte> out, cc::string_view filename, error_handler on_error)
 {
     std::ifstream file(cc::temp_cstr(filename), std::ios_base::binary);
